@@ -28,6 +28,22 @@ import org.junit.Test;
 
 public class PartitionByPatternTest {
 
+    /**
+     *
+     *   ###### first host configuration
+         1-32=0
+         33-64=1
+         65-96=2
+         97-128=3
+         ######## second host configuration
+         129-160=4
+         161-192=5
+         193-224=6
+         225-256=7
+         0-0=7
+     *
+     */
+
 	@Test
 	public void test() {
 		PartitionByPattern autoPartition = new PartitionByPattern();
@@ -35,10 +51,15 @@ public class PartitionByPatternTest {
 		autoPartition.setDefaultNode(2);
 		autoPartition.setMapFile("partition-pattern.txt");
 		autoPartition.init();
+
 		String idVal = "0";
-		Assert.assertEquals(true, 7 == autoPartition.calculate(idVal));
-		idVal = "45a";
-		Assert.assertEquals(true, 2 == autoPartition.calculate(idVal));
+        System.out.println(autoPartition.calculate(idVal));
+        Assert.assertEquals(true, 7 == autoPartition.calculate(idVal));
+
+		idVal = "45254875490";
+        System.out.println(Long.valueOf(idVal)%256);
+        System.out.println(autoPartition.calculate(idVal));
+		//Assert.assertEquals(true, 2 == autoPartition.calculate(idVal));
 
 	}
 }

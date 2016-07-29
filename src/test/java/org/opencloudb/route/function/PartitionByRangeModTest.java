@@ -48,6 +48,7 @@ public class PartitionByRangeModTest
         PartitionByRangeMod autoPartition = new PartitionByRangeMod();
         autoPartition.setMapFile("partition-range-mod.txt");
         autoPartition.init();
+
         String idVal = "0";
         Assert.assertEquals(true, 0 == autoPartition.calculate(idVal));
         idVal = "1";

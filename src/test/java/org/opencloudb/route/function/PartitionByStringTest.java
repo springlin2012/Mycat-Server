@@ -36,18 +36,18 @@ public class PartitionByStringTest {
 		rule.setPartitionCount("2");
 		rule.init();
 		rule.setHashSlice("0:2");
-//		idVal = "0";
-//		Assert.assertEquals(true, 0 == rule.calculate(idVal));
-//		idVal = "45a";
-//		Assert.assertEquals(true, 1 == rule.calculate(idVal));
 
-		
-		
+		idVal = "0";
+		Assert.assertEquals(true, 0 == rule.calculate(idVal));
+		idVal = "45a";
+		Assert.assertEquals(true, 1 == rule.calculate(idVal));
+
 		//last 4
 		rule = new PartitionByString();
 		rule.setPartitionLength("512");
 		rule.setPartitionCount("2");
 		rule.init();
+
 		//last 4 characters
 		rule.setHashSlice("-4:0");
 		idVal = "aaaabbb0000";

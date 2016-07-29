@@ -33,7 +33,6 @@ public class PartitionByRangeDateHashTest
         partition.setsBeginDate("2014-01-01 00:00:00");
         partition.setsPartionDay("3");
         partition.setGroupPartionSize("6");
-
         partition.init();
 
         Integer calculate = partition.calculate("2014-01-01 00:00:00");

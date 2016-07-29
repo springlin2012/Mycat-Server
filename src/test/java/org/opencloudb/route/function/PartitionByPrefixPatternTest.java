@@ -46,7 +46,15 @@ public class PartitionByPrefixPatternTest {
 		autoPartition.init();
 		
 		String idVal="gf89f9a";
-		Assert.assertEquals(true, 0==autoPartition.calculate(idVal)); 
+        // sum = ASCII编码相加
+        int sum = 0;
+        int Length = idVal.length() < 5 ? idVal.length() : 5;
+        for (int i = 0; i < Length; i++) {
+            sum = sum + idVal.charAt(i);
+        }
+        System.out.println("sum = "+ sum +", (ids = sum % patternValue) = "+ (sum % 32));
+
+        Assert.assertEquals(true, 0==autoPartition.calculate(idVal));
 		
 		idVal="8df99a";
 		Assert.assertEquals(true, 4==autoPartition.calculate(idVal)); 
