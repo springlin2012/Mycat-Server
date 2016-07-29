@@ -31,13 +31,31 @@
       <param name="ConversionPattern" value="%d{MM/dd HH:mm:ss.SSS}  %5p [%t] (%F:%L) -%m%n" />
     </layout>
   </appender>
- 
-  
-  <root>
-    <level value="warn" />
-    <appender-ref ref="ConsoleAppender" />
-     <!--<appender-ref ref="FILE" />-->
-  </root>
+
+
+    <root>
+        <level value="debug" />
+        <!--<appender-ref ref="ConsoleAppender" />-->
+        <appender-ref ref="FILE" />
+    </root>
+
+    <!-- 数据mysql连接日志 -->
+    <logger name="org.opencloudb.mysql.nio.MySQLConnection" additivity="false" >
+        <level value="debug" />
+        <appender-ref ref="FILE2" />
+    </logger>
+
+    <appender name="FILE2" class="org.apache.log4j.RollingFileAppender">
+        <param name="file" value="${MYCAT_HOME}/logs/mysql_connection.log" />
+        <param name="Append" value="false"/>
+        <param name="MaxFileSize" value="10000KB"/>
+        <param name="MaxBackupIndex" value="10"/>
+        <param name="encoding" value="UTF-8" />
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%d{MM/dd HH:mm:ss.SSS}  %5p [%t] (%F:%L) -%m%n" />
+        </layout>
+    </appender>
+
 <!--
 <logger name="org.opencloudb.server.NonBlockingSession" >    
  <level value="debug" /> 
