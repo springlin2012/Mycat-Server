@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!DOCTYPE mycat:schema SYSTEM "schema.dtd">
+<mycat:schema xmlns:mycat="http://org.opencloudb/">
+    <!-- 固定hash -->
+
+	<schema name="TESTDB" checkSQLschema="false" sqlMaxLimit="100">
+		<table name="sam_test" primaryKey="id" dataNode="dn1" rule="sharding-by-intfile" />
+
+	</schema>
+
+	<dataNode name="dn1" dataHost="local1" database="test_mycat" />
+	<!--<dataNode name="dn3" dataHost="local1" database="db3" />-->
+
+	<dataHost name="local1" maxCon="100" minCon="10" balance="2"
+		writeType="0" dbType="mysql" dbDriver="native">
+		<heartbeat>select user()</heartbeat>
+		<!-- can have multi write hosts -->
+		<writeHost host="hostM1" url="10.10.16.221:3306" user="root"
+			password="root123">
+			<!-- can have multi read hosts -->
+			 <readHost host="hostS2" url="10.10.16.211:3306" user="root" password="root123"/>
+		</writeHost>
+		<writeHost host="hostS1" url="10.10.16.211:3306" user="root" password="root123" />
+	</dataHost>
+</mycat:schema>

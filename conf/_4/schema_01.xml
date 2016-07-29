@@ -5,7 +5,7 @@
     <schema name="TESTDB" checkSQLschema="false" sqlMaxLimit="100">
         <!-- auto sharding by id (long) -->
         <table name="sam_test" primaryKey="id" dataNode="dn1,dn2" rule="auto-sharding-long">
-            <childTable name="travelrecord" primaryKey="id" joinKey="sharding_id" parentKey="sharding"/>
+            <childTable name="travelrecord" primaryKey="id" joinKey="sharding_id" parentKey="id"/>
         </table>
     </schema>
 
