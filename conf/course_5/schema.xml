@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<!DOCTYPE mycat:schema SYSTEM "schema.dtd">
+<mycat:schema xmlns:mycat="http://org.opencloudb/" >
+
+	<schema name="TESTDB" checkSQLschema="false" sqlMaxLimit="100">
+		<!-- auto sharding by id (long) -->
+		<table name="travelrecord" primaryKey="id" dataNode="dn1,dn2" rule="auto-sharding-long" />
+	</schema>
+
+	<dataNode name="dn1" dataHost="localhost1" database="db1" />
+	<dataNode name="dn2" dataHost="localhost2" database="db1" />
+
+	<dataHost name="localhost1" maxCon="1000" minCon="10" balance="0"
+		writeType="0" dbType="mysql" dbDriver="native" switchType="1"  slaveThreshold="100">
+		<heartbeat>select user()</heartbeat>
+		<!-- can have multi write hosts -->
+		<writeHost host="hostM1" url="10.10.16.158:3306" user="root"
+			password="Root@123">
+		</writeHost>
+	</dataHost>
+
+    <dataHost name="localhost2" maxCon="1000" minCon="10" balance="0"
+              writeType="0" dbType="mysql" dbDriver="native" switchType="1"  slaveThreshold="100">
+        <heartbeat>select user()</heartbeat>
+        <!-- can have multi write hosts -->
+        <writeHost host="hostM1" url="10.10.16.159:3306" user="root"
+                   password="Root@123">
+        </writeHost>
+    </dataHost>
+
+
+</mycat:schema>
