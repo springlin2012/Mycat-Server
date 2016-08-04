@@ -64,8 +64,11 @@ public final class NIOAcceptor extends Thread  implements SocketAcceptor{
 		serverChannel.setOption(StandardSocketOptions.SO_RCVBUF, 1024 * 16 * 2);
 		// backlog=100
 		serverChannel.bind(new InetSocketAddress(bindIp, port), 100);
+        // 注册OP_ACCEPT，监听客户端连接
 		this.serverChannel.register(selector, SelectionKey.OP_ACCEPT);
+        // FrontendConnectionFactory,用来封装channel成为FrontendConnection
 		this.factory = factory;
+        // NIOReactor池
 		this.reactorPool = reactorPool;
 	}
 
