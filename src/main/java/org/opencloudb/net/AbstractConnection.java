@@ -377,13 +377,14 @@ public abstract class AbstractConnection implements NIOConnection {
 
     @Override
 	public final void write(ByteBuffer buffer) {
+        //首先判断是否为压缩协议
         if(isSupportCompress())
         {
+            //CompressUtil为压缩协议辅助工具类
             ByteBuffer     newBuffer= CompressUtil.compressMysqlPacket(buffer,this,compressUnfinishedDataQueue);
+            //将要 写的数据 先放入写缓存队列
             writeQueue.offer(newBuffer);
-
-        }   else
-        {
+        } else {
             writeQueue.offer(buffer);
         }
 
@@ -391,6 +392,7 @@ public abstract class AbstractConnection implements NIOConnection {
 		// flag is set false but not start a write request
 		// so we check again
 		try {
+            //处理写事件，这个方法比较复杂，需要重点分析其思路
 			this.socketWR.doNextWriteCheck();
 		} catch (Exception e) {
 			LOGGER.warn("write err:", e);

@@ -57,6 +57,7 @@ public final class NIOReactor {
 	}
 
 	final void postRegister(AbstractConnection c) {
+        // 放入RW线程的注册队列
 		reactorR.registerQueue.offer(c);
 		reactorR.selector.wakeup();
 	}
@@ -69,6 +70,7 @@ public final class NIOReactor {
 		return reactorR.reactCount;
 	}
 
+    // RW线程注册队列
 	private final class RW implements Runnable {
 		private final Selector selector;
 		private final ConcurrentLinkedQueue<AbstractConnection> registerQueue;
@@ -87,6 +89,8 @@ public final class NIOReactor {
 				++reactCount;
 				try {
 					selector.select(500L);
+                    //从注册队列中取出AbstractConnection之后注册读事件
+                    //之后做一些列操作，请参考下面注释
 					register(selector);
 					keys = selector.selectedKeys();
 					for (SelectionKey key : keys) {
@@ -97,6 +101,7 @@ public final class NIOReactor {
 								con = (AbstractConnection) att;
 								if (key.isValid() && key.isReadable()) {
 									try {
+                                        //异步读取数据并处理数据
 										con.asynRead();
 									} catch (IOException e) {
                                         con.close("program err:" + e.toString());
@@ -107,7 +112,9 @@ public final class NIOReactor {
 										continue;
 									}
 								}
+
 								if (key.isValid() && key.isWritable()) {
+                                    //异步写数据
 									con.doNextWriteCheck();
 								}
 							} else {
@@ -153,7 +160,11 @@ public final class NIOReactor {
 			}
 			while ((c = registerQueue.poll()) != null) {
 				try {
+                    //注册读事件
 					((NIOSocketWR) c.getSocketWR()).register(selector);
+                    //连接注册，对于FrontendConnection是发送HandshakePacket并异步读取响应
+                    //响应为AuthPacket，读取其中的信息，验证用户名密码等信息，如果符合条件
+                    //则发送OkPacket
 					c.register();
 				} catch (Exception e) {
 					c.close("register err" + e.toString());
