@@ -129,11 +129,12 @@ public class ServerConnection extends FrontendConnection {
 	}
 
 	public void execute(String sql, int type) {
+        //连接状态检查
 		if (this.isClosed()) {
 			LOGGER.warn("ignore execute ,server connection is closed " + this);
 			return;
 		}
-		// 状态检查
+        // 事务状态检查
 		if (txInterrupted) {
 			writeErrMessage(ErrorCode.ER_YES,
 					"Transaction error, need to rollback." + txInterrputMsg);

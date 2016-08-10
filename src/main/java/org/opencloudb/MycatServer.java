@@ -108,6 +108,7 @@ public class MycatServer {
 				.getSqlRecordCount());
 		this.isOnline = new AtomicBoolean(true);
 		cacheService = new CacheService();
+        //路由计算初始化
 		routerService = new RouteService(cacheService);
 		// load datanode active index from properties
 		dnIndexProperties = loadDnIndexProps();
@@ -274,10 +275,11 @@ public class MycatServer {
 					+ "NIOConnector", reactorPool);
 			((NIOConnector) connector).start();
 
+            // 创建监听客户端连接事件 (管理服务)
 			manager = new NIOAcceptor(BufferPool.LOCAL_BUF_THREAD_PREX + NAME
 					+ "Manager", system.getBindIp(), system.getManagerPort(),
 					mf, reactorPool);
-
+            // 创建监听客户端连接事件 (Mycat服务)
 			server = new NIOAcceptor(BufferPool.LOCAL_BUF_THREAD_PREX + NAME
 					+ "Server", system.getBindIp(), system.getServerPort(), sf,
 					reactorPool);

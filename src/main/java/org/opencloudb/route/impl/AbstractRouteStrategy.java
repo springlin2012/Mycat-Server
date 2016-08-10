@@ -25,6 +25,7 @@ public abstract class AbstractRouteStrategy implements RouteStrategy {
 
 		/**
 		 * 处理一些路由之前的逻辑
+         * 全局序列号，父子表插入
 		 */
 		if ( beforeRouteProcess(schema, sqlType, origSQL, sc) )
 			return null;
@@ -36,7 +37,8 @@ public abstract class AbstractRouteStrategy implements RouteStrategy {
 		if (origSQL != stmt && LOGGER.isDebugEnabled()) {
 			LOGGER.debug("sql intercepted to " + stmt + " from " + origSQL);
 		}
-		
+
+        // 对应schema标签checkSQLschema属性，把表示schema的字符去掉
 		if (schema.isCheckSQLSchema()) {
 			stmt = RouterUtil.removeSchema(stmt, schema.getName());
 		}
@@ -85,7 +87,14 @@ public abstract class AbstractRouteStrategy implements RouteStrategy {
 	 */
 	private boolean beforeRouteProcess(SchemaConfig schema, int sqlType, String origSQL, ServerConnection sc)
 			throws SQLNonTransientException {
-		
+        /**
+         * 这里利用了Java的一个特性，||表达式，前半部分如果为真，则后半部分不会被执行。
+         * 首先执行RouterUtil.processWithMycatSeq(schema, sqlType, origSQL, sc)，这个方法是判断是否是显示使用全局序列号的sql语句，
+         * 比如像：insert into table1(id,name) values(next value for MYCATSEQ_GLOBAL,‘test’);
+         * 对于这样的语句处理是先将改写next value for MYCATSEQ_GLOBAL 为调用全局ID生成的ID，之后进入AST语句解析路由。
+         *
+         * 如果不是，则执行(sqlType == ServerParse.INSERT && RouterUtil.processERChildTable(schema, origSQL, sc))，这个方法判断是否是子表插入
+         */
 		return RouterUtil.processWithMycatSeq(schema, sqlType, origSQL, sc)
 				|| (sqlType == ServerParse.INSERT && RouterUtil.processERChildTable(schema, origSQL, sc))
 				|| (sqlType == ServerParse.INSERT && RouterUtil.processInsert(schema, sqlType, origSQL, sc));

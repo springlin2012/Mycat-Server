@@ -55,6 +55,7 @@ public class RouteService {
     private final String HINT_SPLIT = "=";
 
 	public RouteService(CacheService cachService) {
+        // 其中sqlRouteCache和tableId2DataNodeCache是通过CacheService（MyCat里面是ehcache做的缓存）传入的对于sql语句缓存和tableid与后台分片对应关系的缓存。
 		sqlRouteCache = cachService.getCachePool("SQLRouteCache");
 		tableId2DataNodeCache = (LayerCachePool) cachService
 				.getCachePool("TableID2DataNodeCache");
