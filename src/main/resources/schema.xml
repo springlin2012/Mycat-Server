@@ -5,29 +5,31 @@
     <schema name="TESTDB" checkSQLschema="false" sqlMaxLimit="100">
         <!-- auto sharding by id (long) -->
         <table name="sam_test" primaryKey="id" dataNode="dn1,dn2" rule="auto-sharding-long">
-            <childTable name="travelrecord" primaryKey="id" joinKey="sharding_id" parentKey="sharding"/>
+            <!--<childTable name="travelrecord" primaryKey="id" joinKey="sharding_id" parentKey="sharding"/>-->
         </table>
+
+        <table name="global_test" primaryKey="id" type="global" dataNode="dn1,dn2" />
     </schema>
 
     <dataNode name="dn1" dataHost="localhost1" database="db1" />
-    <dataNode name="dn2" dataHost="localhost2" database="db1" />
+    <dataNode name="dn2" dataHost="localhost1" database="db2" />
 
     <dataHost name="localhost1" maxCon="1000" minCon="10" balance="0"
               writeType="0" dbType="mysql" dbDriver="native" switchType="1"  slaveThreshold="100">
         <heartbeat>select user()</heartbeat>
         <!-- can have multi write hosts -->
-        <writeHost host="hostM1" url="10.10.16.158:3306" user="root"
+        <writeHost host="hostM1" url="10.17.2.208:3306" user="root"
                    password="Root@123">
         </writeHost>
     </dataHost>
 
-    <dataHost name="localhost2" maxCon="1000" minCon="10" balance="0"
+    <!--<dataHost name="localhost2" maxCon="1000" minCon="10" balance="0"
               writeType="0" dbType="mysql" dbDriver="native" switchType="1"  slaveThreshold="100">
         <heartbeat>select user()</heartbeat>
-        <!-- can have multi write hosts -->
+        &lt;!&ndash; can have multi write hosts &ndash;&gt;
         <writeHost host="hostM1" url="10.10.16.159:3306" user="root"
                    password="Root@123">
         </writeHost>
-    </dataHost>
+    </dataHost>-->
 
 </mycat:schema>

@@ -53,4 +53,13 @@ CREATE TABLE sam_test (
   PRIMARY KEY (id)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8 ROW_FORMAT=COMPACT;
 
+-- ----------------------------
+-- Table 全局表
+-- ----------------------------
+CREATE TABLE global_test (
+  id bigint(11) NOT NULL AUTO_INCREMENT,
+  name_ varchar(255) DEFAULT NULL,
+  code bigint(20) DEFAULT NULL,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8 ROW_FORMAT=COMPACT;
 

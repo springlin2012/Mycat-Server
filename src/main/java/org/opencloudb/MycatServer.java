@@ -284,6 +284,7 @@ public class MycatServer {
 					+ "Server", system.getBindIp(), system.getServerPort(), sf,
 					reactorPool);
 		}
+
 		// manager start
 		manager.start();
 		LOGGER.info(manager.getName() + " is started and listening on "
