@@ -23,15 +23,17 @@
  */
 package io.mycat.server;
 
-import org.slf4j.Logger; import org.slf4j.LoggerFactory;
-
 import io.mycat.config.ErrorCode;
 import io.mycat.net.handler.FrontendQueryHandler;
 import io.mycat.net.mysql.OkPacket;
 import io.mycat.server.handler.*;
 import io.mycat.server.parser.ServerParse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
+ * 前端服务器查询处理器
+ *
  * @author mycat
  */
 public class ServerQueryHandler implements FrontendQueryHandler {
@@ -51,7 +53,6 @@ public class ServerQueryHandler implements FrontendQueryHandler {
 
 	@Override
 	public void query(String sql) {
-		
 		ServerConnection c = this.source;
 		if (LOGGER.isDebugEnabled()) {
 			LOGGER.debug(new StringBuilder().append(c).append(sql).toString());
@@ -61,12 +62,12 @@ public class ServerQueryHandler implements FrontendQueryHandler {
 		int sqlType = rs & 0xff;
 		
 		switch (sqlType) {
-		//explain sql
 		case ServerParse.EXPLAIN:
+			//explain sql
 			ExplainHandler.handle(sql, c, rs >>> 8);
 			break;
-		//explain2 datanode=? sql=?
 		case ServerParse.EXPLAIN2:
+			//explain2 datanode=? sql=?
 			Explain2Handler.handle(sql, c, rs >>> 8);
 			break;
 		case ServerParse.SET:
@@ -76,9 +77,7 @@ public class ServerQueryHandler implements FrontendQueryHandler {
 			ShowHandler.handle(sql, c, rs >>> 8);
 			break;
 		case ServerParse.SELECT:
-			if(QuarantineHandler.handle(sql, c)){
-				SelectHandler.handle(sql, c, rs >>> 8);
-			}
+			SelectHandler.handle(sql, c, rs >>> 8);
 			break;
 		case ServerParse.START:
 			StartHandler.handle(sql, c, rs >>> 8);
@@ -86,15 +85,15 @@ public class ServerQueryHandler implements FrontendQueryHandler {
 		case ServerParse.BEGIN:
 			BeginHandler.handle(sql, c);
 			break;
-		//不支持oracle的savepoint事务回退点
 		case ServerParse.SAVEPOINT:
+			//不支持oracle的savepoint事务回退点
 			SavepointHandler.handle(sql, c);
 			break;
 		case ServerParse.KILL:
 			KillHandler.handle(sql, rs >>> 8, c);
 			break;
-		//不支持KILL_Query
 		case ServerParse.KILL_QUERY:
+			//不支持KILL_Query
 			LOGGER.warn(new StringBuilder().append("Unsupported command:").append(sql).toString());
 			c.writeErrMessage(ErrorCode.ER_UNKNOWN_COM_ERROR,"Unsupported command");
 			break;
@@ -102,9 +101,11 @@ public class ServerQueryHandler implements FrontendQueryHandler {
 			UseHandler.handle(sql, c, rs >>> 8);
 			break;
 		case ServerParse.COMMIT:
+			// 事务提交
 			c.commit();
 			break;
 		case ServerParse.ROLLBACK:
+			// 事务回滚
 			c.rollback();
 			break;
 		case ServerParse.HELP:
@@ -117,18 +118,41 @@ public class ServerQueryHandler implements FrontendQueryHandler {
 		case ServerParse.MYSQL_COMMENT:
 			c.write(c.writeToBuffer(OkPacket.OK, c.allocate()));
 			break;
-            case ServerParse.LOAD_DATA_INFILE_SQL:
-                c.loadDataInfileStart(sql);
-                break;
+        case ServerParse.LOAD_DATA_INFILE_SQL:
+        	// 从文件加载数据开始
+            c.loadDataInfileStart(sql);
+            break;
+		case ServerParse.MIGRATE: {
+		    try {
+                MigrateHandler.handle(sql, c);
+            }catch (Throwable e){
+		        //MigrateHandler中InterProcessMutex slaveIDsLock 会连接zk,zk连接不上会导致类加载失败,
+                // 此后再调用此命令,将会出现类未定义,所以最终还是需要重启mycat
+		        e.printStackTrace();
+                String msg = "Mycat is not connected to zookeeper!!\n";
+                msg += "Please start zookeeper and restart mycat so that this mycat can temporarily execute the migration command.If other mycat does not connect to this zookeeper, they will not be able to perceive changes in the migration task.\n";
+                msg += "After starting zookeeper,you can command tas follow:\n\nmigrate -table=schema.test -add=dn2,dn3 -force=true\n\nto perform the migration.\n";
+                LOGGER.error(e.getMessage());
+                LOGGER.error(msg);
+                c.writeErrMessage(ErrorCode.ER_UNKNOWN_ERROR, msg);
+            }
+			break;
+		}
+		case ServerParse.LOCK:
+			// 锁表
+        	c.lockTable(sql);
+        	break;
+        case ServerParse.UNLOCK:
+			// 解锁表
+        	c.unLockTable(sql);
+        	break;
 		default:
 			if(readOnly){
 				LOGGER.warn(new StringBuilder().append("User readonly:").append(sql).toString());
 				c.writeErrMessage(ErrorCode.ER_USER_READ_ONLY, "User readonly");
 				break;
 			}
-			if(QuarantineHandler.handle(sql, c)){
-				c.execute(sql, rs & 0xff);
-			}
+			c.execute(sql, rs & 0xff);
 		}
 	}
 

@@ -1,5 +1,6 @@
 package io.mycat.route;
 
+import io.mycat.MycatServer;
 import io.mycat.SimpleCachePool;
 import io.mycat.cache.CacheService;
 import io.mycat.cache.LayerCachePool;
@@ -9,12 +10,10 @@ import io.mycat.config.model.SchemaConfig;
 import io.mycat.config.model.SystemConfig;
 import io.mycat.route.factory.RouteStrategyFactory;
 import io.mycat.server.parser.ServerParse;
+import junit.framework.Assert;
+import org.junit.Test;
 
 import java.util.Map;
-
-import junit.framework.Assert;
-
-import org.junit.Test;
 
 public class HintDBTypeTest {
 	protected Map<String, SchemaConfig> schemaMap;
@@ -26,6 +25,7 @@ public class HintDBTypeTest {
 		String ruleFile = "/route/rule.xml";
 		SchemaLoader schemaLoader = new XMLSchemaLoader(schemaFile, ruleFile);
 		schemaMap = schemaLoader.getSchemas();
+		MycatServer.getInstance().getConfig().getSchemas().putAll(schemaMap);
         RouteStrategyFactory.init();
         routeStrategy = RouteStrategyFactory.getRouteStrategy("druidparser");
 	}

@@ -23,22 +23,38 @@
  */
 package io.mycat.config.model;
 
+import com.google.common.collect.Iterables;
+import io.mycat.backend.datasource.PhysicalDBPool;
+
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import io.mycat.backend.datasource.PhysicalDBPool;
-
 /**
  * Datahost is a group of DB servers which is synchronized with each other
+ * Datahost（节点主机）是一组相互同步的数据库服务器
  *
  * @author wuzhih
  *
  */
 public class DataHostConfig {
+	/**
+	 * 不自动切换
+	 */
 	public static final int NOT_SWITCH_DS = -1;
+	/**
+	 * 默认值，自动切换
+	 */
 	public static final int DEFAULT_SWITCH_DS = 1;
+	/**
+	 * 基于 MySQL 主从同步的状态决定是否切换
+	 */
 	public static final int SYN_STATUS_SWITCH_DS = 2;
+	/**
+	 * 基于集群状态决定是否切换
+	 */
 	public static final int CLUSTER_STATUS_SWITCH_DS = 3;
     private static final Pattern pattern = Pattern.compile("\\s*show\\s+slave\\s+status\\s*",Pattern.CASE_INSENSITIVE);
     private static final Pattern patternCluster = Pattern.compile("\\s*show\\s+status\\s+like\\s+'wsrep%'",Pattern.CASE_INSENSITIVE);
@@ -56,11 +72,22 @@ public class DataHostConfig {
     private boolean isShowClusterSql=false;
 	private String connectionInitSql;
     private int slaveThreshold = -1;
+    // 切换方式
 	private final int switchType;
 	private String filters="mergeStat";
 	private long logTime=300000;
-	private boolean tempReadHostAvailable = false;  //如果写服务挂掉, 临时读服务是否继续可用
+	// 如果写服务挂掉, 临时读服务是否继续可用
+	private boolean tempReadHostAvailable = false;
+	// 包含的所有dataNode名字
+	private final Set<String> dataNodes;
+	// 从节点ID
+	private String slaveIDs;
+	private int maxRetryCount = 3; // 心跳失败时候重试的次数. @auth zwy
+	public static final String FOVER_NOT_SWITCH_DS = "1";
+	public static final String CAN_SWITCH_DS = "0";
 
+	private String notSwitch = CAN_SWITCH_DS;
+	
 	public DataHostConfig(String name, String dbType, String dbDriver,
 			DBHostConfig[] writeHosts, Map<Integer, DBHostConfig[]> readHosts,int switchType,int slaveThreshold, boolean tempReadHostAvailable) {
 		super();
@@ -72,8 +99,9 @@ public class DataHostConfig {
 		this.switchType=switchType;
 		this.slaveThreshold=slaveThreshold;
 		this.tempReadHostAvailable = tempReadHostAvailable;
+		this.dataNodes = new HashSet<>();
 	}
-	
+
 	public boolean isTempReadHostAvailable() {
 		return this.tempReadHostAvailable;
 	}
@@ -90,13 +118,11 @@ public class DataHostConfig {
 		return switchType;
 	}
 
-	public String getConnectionInitSql()
-	{
+	public String getConnectionInitSql() {
 		return connectionInitSql;
 	}
 
-	public void setConnectionInitSql(String connectionInitSql)
-	{
+	public void setConnectionInitSql(String connectionInitSql) {
 		this.connectionInitSql = connectionInitSql;
 	}
 
@@ -116,8 +142,7 @@ public class DataHostConfig {
 		this.name = name;
 	}
 
-    public boolean isShowSlaveSql()
-    {
+    public boolean isShowSlaveSql() {
         return isShowSlaveSql;
     }
 
@@ -135,6 +160,14 @@ public class DataHostConfig {
 
 	public void setMinCon(int minCon) {
 		this.minCon = minCon;
+	}
+
+	public String getSlaveIDs() {
+		return slaveIDs;
+	}
+
+	public void setSlaveIDs(String slaveIDs) {
+		this.slaveIDs = slaveIDs;
 	}
 
 	public int getBalance() {
@@ -168,13 +201,11 @@ public class DataHostConfig {
 	public void setHearbeatSQL(String heartbeatSQL) {
 		this.hearbeatSQL = heartbeatSQL;
         Matcher matcher = pattern.matcher(heartbeatSQL);
-        if (matcher.find())
-        {
+        if (matcher.find()) {
             isShowSlaveSql=true;
         }
         Matcher matcher2 = patternCluster.matcher(heartbeatSQL);
-        if (matcher2.find())
-        {
+        if (matcher2.find()) {
         	isShowClusterSql=true;
         }
 	}
@@ -198,4 +229,34 @@ public class DataHostConfig {
 	public void setLogTime(long logTime) {
 		this.logTime = logTime;
 	}
+
+	public void addDataNode(String name){
+		this.dataNodes.add(name);
+	}
+
+	public String getRandomDataNode() {
+		int index = (int) (Math.random() * dataNodes.size());
+		return Iterables.get(dataNodes,index);
+	}
+
+    public boolean containDataNode(String randomDn) {
+        return dataNodes.contains(randomDn);
+    }
+
+	public int getMaxRetryCount() {
+		return maxRetryCount;
+	}
+
+	public void setMaxRetryCount(int maxRetryCount) {
+		this.maxRetryCount = maxRetryCount;
+	}
+
+	public String getNotSwitch() {
+		return notSwitch;
+	}
+
+	public void setNotSwitch(String notSwitch) {
+		this.notSwitch = notSwitch;
+	}
+	
 }

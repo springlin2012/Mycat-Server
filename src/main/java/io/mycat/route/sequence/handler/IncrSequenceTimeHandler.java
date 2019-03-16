@@ -1,10 +1,11 @@
 package io.mycat.route.sequence.handler;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
-
-import org.slf4j.Logger; import org.slf4j.LoggerFactory;
 
 public class IncrSequenceTimeHandler implements SequenceHandler {
     protected static final Logger LOGGER = LoggerFactory.getLogger(IncrSequenceTimeHandler.class);
@@ -99,7 +100,7 @@ public class IncrSequenceTimeHandler implements SequenceHandler {
 			try {
 				throw new Exception("Clock moved backwards.  Refusing to generate id for "+ (lastTimestamp - timestamp) + " milliseconds");
 			} catch (Exception e) {
-				e.printStackTrace();
+				LOGGER.error("error",e);
 			}
 			}
 
@@ -111,7 +112,7 @@ public class IncrSequenceTimeHandler implements SequenceHandler {
 					timestamp = tilNextMillis(lastTimestamp);
 				}
 			} else {
-				sequence = 0;
+				sequence = timestamp & 1;
 			}
 			lastTimestamp = timestamp;
 			// ID偏移组合生成最终的ID，并返回ID

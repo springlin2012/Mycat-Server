@@ -19,7 +19,6 @@ package io.mycat.memory.unsafe.map;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Closeables;
-
 import io.mycat.memory.unsafe.Platform;
 import io.mycat.memory.unsafe.array.ByteArrayMethods;
 import io.mycat.memory.unsafe.array.LongArray;
@@ -800,7 +799,7 @@ public final class BytesToBytesMap extends MemoryConsumer {
     assert (capacity >= 0);
     capacity = Math.max((int) Math.min(MAX_CAPACITY, ByteArrayMethods.nextPowerOf2(capacity)), 64);
     assert (capacity <= MAX_CAPACITY);
-    longArray = allocateArray(capacity * 2);
+    longArray = allocateLongArray(capacity * 2);
     longArray.zeroOut();
 
     this.growthThreshold = (int) (capacity * loadFactor);
@@ -816,7 +815,7 @@ public final class BytesToBytesMap extends MemoryConsumer {
   public void free() {
     updatePeakMemoryUsed();
     if (longArray != null) {
-      freeArray(longArray);
+      freeLongArray(longArray);
       longArray = null;
     }
     Iterator<MemoryBlock> dataPagesIterator = dataPages.iterator();
@@ -962,7 +961,7 @@ public final class BytesToBytesMap extends MemoryConsumer {
       longArray.set(newPos * 2 + 1, hashcode);
     }
 
-    freeArray(oldLongArray);
+    freeLongArray(oldLongArray);
 
     if (enablePerfMetrics) {
       timeSpentResizingNs += System.nanoTime() - resizeStartTime;

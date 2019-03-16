@@ -1,19 +1,6 @@
 package io.mycat.backend.postgresql.utils;
 
-import io.mycat.backend.postgresql.packet.AuthenticationPacket;
-import io.mycat.backend.postgresql.packet.BackendKeyData;
-import io.mycat.backend.postgresql.packet.CommandComplete;
-import io.mycat.backend.postgresql.packet.CopyInResponse;
-import io.mycat.backend.postgresql.packet.CopyOutResponse;
-import io.mycat.backend.postgresql.packet.DataRow;
-import io.mycat.backend.postgresql.packet.EmptyQueryResponse;
-import io.mycat.backend.postgresql.packet.ErrorResponse;
-import io.mycat.backend.postgresql.packet.NoticeResponse;
-import io.mycat.backend.postgresql.packet.ParameterStatus;
-import io.mycat.backend.postgresql.packet.ParseComplete;
-import io.mycat.backend.postgresql.packet.PostgreSQLPacket;
-import io.mycat.backend.postgresql.packet.ReadyForQuery;
-import io.mycat.backend.postgresql.packet.RowDescription;
+import io.mycat.backend.postgresql.packet.*;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -84,7 +71,7 @@ public class PacketUtils {
 	}
 	
 	@Deprecated
-	public static List<PostgreSQLPacket> parsePacket(byte[] bytes, int offset,
+	private static List<PostgreSQLPacket> parsePacket(byte[] bytes, int offset,
 			int readLength) throws IOException {
 		List<PostgreSQLPacket> pgs = new ArrayList<>();
 		while (offset < readLength) {

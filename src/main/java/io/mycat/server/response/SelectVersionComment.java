@@ -23,8 +23,6 @@
  */
 package io.mycat.server.response;
 
-import java.nio.ByteBuffer;
-
 import io.mycat.backend.mysql.PacketUtil;
 import io.mycat.config.Fields;
 import io.mycat.net.mysql.EOFPacket;
@@ -33,12 +31,14 @@ import io.mycat.net.mysql.ResultSetHeaderPacket;
 import io.mycat.net.mysql.RowDataPacket;
 import io.mycat.server.ServerConnection;
 
+import java.nio.ByteBuffer;
+
 /**
  * @author mycat
  */
 public class SelectVersionComment {
 
-    private static final byte[] VERSION_COMMENT = "MyCat Server (OpenCloundDB)".getBytes();
+    private static final byte[] VERSION_COMMENT = "MyCat Server (OpenCloudDB)".getBytes();
     private static final int FIELD_COUNT = 1;
     private static final ResultSetHeaderPacket header = PacketUtil.getHeader(FIELD_COUNT);
     private static final FieldPacket[] fields = new FieldPacket[FIELD_COUNT];

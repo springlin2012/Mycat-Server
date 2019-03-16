@@ -4,14 +4,14 @@ package io.mycat.memory;
 import com.google.common.annotations.VisibleForTesting;
 import io.mycat.config.model.SystemConfig;
 import io.mycat.memory.unsafe.Platform;
-import io.mycat.memory.unsafe.memory.mm.DataNodeMemoryManager;
 import io.mycat.memory.unsafe.memory.mm.MemoryManager;
 import io.mycat.memory.unsafe.memory.mm.ResultMergeMemoryManager;
 import io.mycat.memory.unsafe.storage.DataNodeDiskManager;
 import io.mycat.memory.unsafe.storage.SerializerManager;
 import io.mycat.memory.unsafe.utils.JavaUtils;
 import io.mycat.memory.unsafe.utils.MycatPropertyConf;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Created by zagnix on 2016/6/2.
@@ -25,9 +25,9 @@ import org.apache.log4j.Logger;
  */
 
 public class MyCatMemory {
-	private static Logger LOGGER = Logger.getLogger(MyCatMemory.class);
+	private static Logger LOGGER = LoggerFactory.getLogger(MyCatMemory.class);
 
-	private final  static double DIRECT_SAFETY_FRACTION  = 0.7;
+	public final  static double DIRECT_SAFETY_FRACTION  = 0.7;
 	private final long systemReserveBufferSize;
 
 	private final long memoryPageSize;
@@ -41,7 +41,6 @@ public class MyCatMemory {
 	 */
 	private final MycatPropertyConf conf;
 	private final MemoryManager resultMergeMemoryManager;
-	private final DataNodeMemoryManager dataNodeMemoryManager;
 	private final DataNodeDiskManager blockManager;
 	private final SerializerManager serializerManager;
 	private final SystemConfig system;
@@ -59,16 +58,13 @@ public class MyCatMemory {
 		LOGGER.info("totalNetWorkBufferSize = " + JavaUtils.bytesToString2(totalNetWorkBufferSize));
 		LOGGER.info("dataNodeSortedTempDir = " + system.getDataNodeSortedTempDir());
 
-		conf = new MycatPropertyConf();
+		this.conf = new MycatPropertyConf();
 		numCores = Runtime.getRuntime().availableProcessors();
 
-		this.systemReserveBufferSize = JavaUtils.
-				byteStringAsBytes(system.getSystemReserveMemorySize());
-		this.memoryPageSize = JavaUtils.
-				byteStringAsBytes(system.getMemoryPageSize());
+		this.systemReserveBufferSize = JavaUtils.byteStringAsBytes(system.getSystemReserveMemorySize());
+		this.memoryPageSize = JavaUtils.byteStringAsBytes(system.getMemoryPageSize());
 
-		this.spillsFileBufferSize = JavaUtils.
-				byteStringAsBytes(system.getSpillsFileBufferSize());
+		this.spillsFileBufferSize = JavaUtils.byteStringAsBytes(system.getSpillsFileBufferSize());
 
 		/**
 		 * 目前merge，order by ，limit 没有使用On Heap内存
@@ -77,8 +73,7 @@ public class MyCatMemory {
 
 		assert maxOnHeapMemory > 0;
 
-		resultSetBufferSize =
-				(long)((Platform.getMaxDirectMemory()-2*totalNetWorkBufferSize)*DIRECT_SAFETY_FRACTION);
+		resultSetBufferSize = (long)((Platform.getMaxDirectMemory()-2*totalNetWorkBufferSize)*DIRECT_SAFETY_FRACTION);
 
 		assert resultSetBufferSize > 0;
 
@@ -107,7 +102,7 @@ public class MyCatMemory {
 		if(system.getMemoryPageSize() != null){
 			conf.set("mycat.buffer.pageSize",system.getMemoryPageSize());
 		}else{
-			conf.set("mycat.buffer.pageSize","1m");
+			conf.set("mycat.buffer.pageSize","32k");
 		}
 
 
@@ -117,16 +112,12 @@ public class MyCatMemory {
 			conf.set("mycat.merge.file.buffer","32k");
 		}
 
-		conf.set("mycat.pointer.array.len","8k")
+		conf.set("mycat.pointer.array.len","1k")
 			.set("mycat.memory.offHeap.size", JavaUtils.bytesToString2(resultSetBufferSize));
 
-		LOGGER.info("mycat.memory.offHeap.size: " +
-				JavaUtils.bytesToString2(resultSetBufferSize));
+		LOGGER.info("mycat.memory.offHeap.size: " + JavaUtils.bytesToString2(resultSetBufferSize));
 
-		resultMergeMemoryManager =
-				new ResultMergeMemoryManager(conf,numCores,maxOnHeapMemory);
-
-		dataNodeMemoryManager = new DataNodeMemoryManager(resultMergeMemoryManager,1);
+		resultMergeMemoryManager = new ResultMergeMemoryManager(conf,numCores,maxOnHeapMemory);
 
 		serializerManager = new SerializerManager();
 
@@ -170,8 +161,6 @@ public class MyCatMemory {
 		resultMergeMemoryManager =
 				new ResultMergeMemoryManager(conf,numCores,maxOnHeapMemory);
 
-		dataNodeMemoryManager = new DataNodeMemoryManager(resultMergeMemoryManager,1);
-
 		serializerManager = new SerializerManager();
 
 		blockManager = new DataNodeDiskManager(conf,true,serializerManager);
@@ -182,10 +171,6 @@ public class MyCatMemory {
 		return conf;
 	}
 
-	public int getNumCores() {
-		return numCores;
-	}
-
 	public long getResultSetBufferSize() {
 		return resultSetBufferSize;
 	}
@@ -194,28 +179,12 @@ public class MyCatMemory {
 		return resultMergeMemoryManager;
 	}
 
-	public DataNodeMemoryManager getDataNodeMemoryManager() {
-		return dataNodeMemoryManager;
-	}
-
 	public SerializerManager getSerializerManager() {
 		return serializerManager;
 	}
 
 	public DataNodeDiskManager getBlockManager() {
 		return blockManager;
-	}
-
-	public long getSystemReserveBufferSize() {
-		return systemReserveBufferSize;
-	}
-
-	public long getMemoryPageSize() {
-		return memoryPageSize;
-	}
-
-	public long getSpillsFileBufferSize() {
-		return spillsFileBufferSize;
 	}
 
 }

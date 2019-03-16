@@ -23,14 +23,15 @@
  */
 package io.mycat.net;
 
-import java.nio.channels.CompletionHandler;
-
-import org.slf4j.Logger; import org.slf4j.LoggerFactory;
-
 import io.mycat.MycatServer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.nio.channels.CompletionHandler;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
+ * AIO连接器
  * @author mycat
  */
 public final class AIOConnector implements SocketConnector,
@@ -63,7 +64,7 @@ public final class AIOConnector implements SocketConnector,
 			}
 		} catch (Exception e) {
 			c.onConnectFailed(e);
-			LOGGER.info("connect err " + e);
+			LOGGER.info("connect err " , e);
 			c.close(e.toString());
 		}
 	}

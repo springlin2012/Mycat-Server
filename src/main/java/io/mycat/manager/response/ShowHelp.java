@@ -23,14 +23,6 @@
  */
 package io.mycat.manager.response;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-
 import io.mycat.backend.mysql.PacketUtil;
 import io.mycat.config.Fields;
 import io.mycat.manager.ManagerConnection;
@@ -39,6 +31,12 @@ import io.mycat.net.mysql.FieldPacket;
 import io.mycat.net.mysql.ResultSetHeaderPacket;
 import io.mycat.net.mysql.RowDataPacket;
 import io.mycat.util.StringUtil;
+
+import java.nio.ByteBuffer;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 打印MycatServer所支持的语句
@@ -148,7 +146,9 @@ public final class ShowHelp {
         helps.put("show @@syslog limit=?", "Report system mycat.log");
         helps.put("show @@white", "show mycat white host ");
         helps.put("show @@white.set=?,?", "set mycat white host,[ip,user]");
-        
+		helps.put("show @@directmemory=1 or 2", "show mycat direct memory usage");
+		helps.put("show @@check_global -SCHEMA= ? -TABLE=? -retry=? -interval=?", "check mycat global table consistency ");
+
         // switch
         helps.put("switch @@datasource name:index", "Switch dataSource");
 

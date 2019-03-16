@@ -1,20 +1,18 @@
 package io.mycat.route;
 
-import java.sql.SQLNonTransientException;
-import java.util.Map;
-
-import org.junit.Test;
-
+import io.mycat.MycatServer;
 import io.mycat.SimpleCachePool;
 import io.mycat.cache.LayerCachePool;
 import io.mycat.config.loader.SchemaLoader;
 import io.mycat.config.loader.xml.XMLSchemaLoader;
 import io.mycat.config.model.SchemaConfig;
 import io.mycat.config.model.SystemConfig;
-import io.mycat.route.RouteResultset;
-import io.mycat.route.RouteStrategy;
 import io.mycat.route.factory.RouteStrategyFactory;
 import junit.framework.Assert;
+import org.junit.Test;
+
+import java.sql.SQLNonTransientException;
+import java.util.Map;
 
 public class DruidSqlServerSqlParserTest
 {
@@ -27,6 +25,7 @@ public class DruidSqlServerSqlParserTest
 		String ruleFile = "/route/rule.xml";
 		SchemaLoader schemaLoader = new XMLSchemaLoader(schemaFile, ruleFile);
 		schemaMap = schemaLoader.getSchemas();
+		MycatServer.getInstance().getConfig().getSchemas().putAll(schemaMap);
         RouteStrategyFactory.init();
         routeStrategy = RouteStrategyFactory.getRouteStrategy("druidparser");
 	}
@@ -157,8 +156,7 @@ public class DruidSqlServerSqlParserTest
 
 
     @Test
-    public void testTopPageSQL() throws SQLNonTransientException
-    {
+    public void testTopPageSQL() throws SQLNonTransientException {
         SchemaConfig schema = schemaMap.get("sqlserverdb");
         RouteResultset rrs = null;
 

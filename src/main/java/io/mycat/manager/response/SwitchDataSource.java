@@ -23,14 +23,14 @@
  */
 package io.mycat.manager.response;
 
-import java.util.Map;
-
 import io.mycat.MycatServer;
 import io.mycat.backend.datasource.PhysicalDBPool;
 import io.mycat.manager.ManagerConnection;
 import io.mycat.net.mysql.OkPacket;
 import io.mycat.route.parser.ManagerParseSwitch;
 import io.mycat.route.parser.util.Pair;
+
+import java.util.Map;
 
 /**
  * 切换数据节点的数据源
@@ -49,8 +49,17 @@ public final class SwitchDataSource {
             if (dn != null) {
                 int m = dn.getActivedIndex();
                 int n = (idx == null) ? dn.next(m) : idx.intValue();
-                if (dn.switchSource(n, false, "MANAGER")) {
-                    ++count;
+                if(!dn.notSwitchSource(n)) {
+                	//todo 如果是zk集群 需要将结果写入到zk中再来切换.
+                    if(MycatServer.getInstance().isUseZkSwitch()) {
+                    	MycatServer.getInstance().saveDataHostIndexToZk(dn.getHostName(), n);
+                        ++count;
+            			//return switchSourceVoted( n,  isAlarm,  reason); 
+            		} else {
+            			 if (dn.switchSource(n, false, "MANAGER")) {
+                             ++count;
+                         }
+            		}
                 }
             }
         }

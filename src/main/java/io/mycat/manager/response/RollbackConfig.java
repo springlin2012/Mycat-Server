@@ -23,22 +23,22 @@
  */
 package io.mycat.manager.response;
 
-import java.util.Map;
-import java.util.concurrent.locks.ReentrantLock;
-
-import org.slf4j.Logger; import org.slf4j.LoggerFactory;
-
 import io.mycat.MycatServer;
 import io.mycat.backend.datasource.PhysicalDBNode;
 import io.mycat.backend.datasource.PhysicalDBPool;
 import io.mycat.config.ErrorCode;
 import io.mycat.config.MycatCluster;
 import io.mycat.config.MycatConfig;
-import io.mycat.config.model.QuarantineConfig;
+import io.mycat.config.model.FirewallConfig;
 import io.mycat.config.model.SchemaConfig;
 import io.mycat.config.model.UserConfig;
 import io.mycat.manager.ManagerConnection;
 import io.mycat.net.mysql.OkPacket;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * @author mycat
@@ -76,7 +76,7 @@ public final class RollbackConfig {
 		Map<String, PhysicalDBNode> dataNodes = conf.getBackupDataNodes();
 		Map<String, PhysicalDBPool> dataHosts = conf.getBackupDataHosts();
 		MycatCluster cluster = conf.getBackupCluster();
-		QuarantineConfig quarantine = conf.getBackupQuarantine();
+		FirewallConfig firewall = conf.getBackupFirewall();
 
 		// 检查可回滚状态
 		if (!conf.canRollback()) {
@@ -103,7 +103,7 @@ public final class RollbackConfig {
 		}
 
 		// 应用回滚
-		conf.rollback(users, schemas, dataNodes, dataHosts, cluster, quarantine);
+		conf.rollback(users, schemas, dataNodes, dataHosts, cluster, firewall);
 
 		// 处理旧的资源
 		for (PhysicalDBPool dn : cNodes.values()) {

@@ -23,25 +23,6 @@
  */
 package io.mycat.manager.handler;
 
-import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-
-import javax.xml.parsers.ParserConfigurationException;
-
-import org.slf4j.Logger; import org.slf4j.LoggerFactory;
-import org.xml.sax.SAXException;
-
 import io.mycat.MycatServer;
 import io.mycat.backend.mysql.PacketUtil;
 import io.mycat.config.Fields;
@@ -53,6 +34,15 @@ import io.mycat.net.mysql.FieldPacket;
 import io.mycat.net.mysql.ResultSetHeaderPacket;
 import io.mycat.net.mysql.RowDataPacket;
 import io.mycat.util.StringUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.xml.sax.SAXException;
+
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /**
  * Mycat conf file related Handler
@@ -71,7 +61,7 @@ public final class ConfFileHandler {
 	static {
 		int i = 0;
 		byte packetId = 0;
-		header.packetId = 1;
+		header.packetId = ++packetId;
 
 		fields[i] = PacketUtil.getField("DATA", Fields.FIELD_TYPE_VAR_STRING);
 		fields[i++].packetId = ++packetId;

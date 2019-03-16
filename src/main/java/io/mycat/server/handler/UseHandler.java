@@ -23,16 +23,17 @@
  */
 package io.mycat.server.handler;
 
-import java.nio.ByteBuffer;
-import java.util.Set;
-
 import io.mycat.config.ErrorCode;
 import io.mycat.net.handler.FrontendPrivileges;
 import io.mycat.net.mysql.OkPacket;
 import io.mycat.server.ServerConnection;
 import io.mycat.util.StringUtil;
 
+import java.nio.ByteBuffer;
+import java.util.Set;
+
 /**
+ * Use 语句处理器
  * @author mycat
  */
 public final class UseHandler {
@@ -41,11 +42,15 @@ public final class UseHandler {
         String schema = sql.substring(offset).trim();
         int length = schema.length();
         if (length > 0) {
-        	if(schema.endsWith(";")) {
-                schema = schema.substring(0, schema.length() - 1);
+        	//许多客户端工具断链重连后会批量发送SQL,如下:
+            //USE `TESTDB`;\nSELECT SYSDATE(),CURRENT_USER()
+            //modify by jeff.cao 2018/3/31
+            int end = schema.indexOf(";");
+            if (end > 0) {
+                schema = schema.substring(0, end - 1);
             }
         	schema = StringUtil.replaceChars(schema, "`", null);
-        	length=schema.length();
+        	length = schema.length();
             if (schema.charAt(0) == '\'' && schema.charAt(length - 1) == '\'') {
                 schema = schema.substring(1, length - 1);
             }
@@ -63,7 +68,7 @@ public final class UseHandler {
         }
         Set<String> schemas = privileges.getUserSchemas(user);
         if (schemas == null || schemas.size() == 0 || schemas.contains(schema)) {
-            c.setSchema(schema);
+            c.setSchema(schema); //设置逻辑库 数据库
             ByteBuffer buffer = c.allocate();
             c.write(c.writeToBuffer(OkPacket.OK, buffer));
         } else {

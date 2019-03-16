@@ -23,15 +23,6 @@
  */
 package io.mycat.manager.response;
 
-import java.nio.ByteBuffer;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-
 import io.mycat.MycatServer;
 import io.mycat.backend.datasource.PhysicalDBNode;
 import io.mycat.backend.datasource.PhysicalDBPool;
@@ -39,6 +30,7 @@ import io.mycat.backend.datasource.PhysicalDatasource;
 import io.mycat.backend.mysql.PacketUtil;
 import io.mycat.config.Fields;
 import io.mycat.config.MycatConfig;
+import io.mycat.config.MycatPrivileges;
 import io.mycat.config.model.SchemaConfig;
 import io.mycat.manager.ManagerConnection;
 import io.mycat.net.mysql.EOFPacket;
@@ -51,6 +43,11 @@ import io.mycat.util.IntegerUtil;
 import io.mycat.util.LongUtil;
 import io.mycat.util.StringUtil;
 import io.mycat.util.TimeUtil;
+
+import java.nio.ByteBuffer;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
+import java.util.*;
 
 /**
  * 查看数据节点信息
@@ -134,7 +131,12 @@ public final class ShowDataNode {
 		Map<String, PhysicalDBNode> dataNodes = conf.getDataNodes();
 		List<String> keys = new ArrayList<String>();
 		if (StringUtil.isEmpty(name)) {
-			keys.addAll(dataNodes.keySet());
+			for(String key : dataNodes.keySet()){
+				MycatPrivileges myCatprivileges = (MycatPrivileges)( c.getPrivileges());
+				if(myCatprivileges.checkDataNodeDmlPrivilege(c.getUser(), key, c.getExecuteSql())) {
+					keys.add(key);
+				}
+			}
 		} else {
 			SchemaConfig sc = conf.getSchemas().get(name);
 			if (null != sc) {

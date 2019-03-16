@@ -23,9 +23,6 @@
  */
 package io.mycat.route.function;
 
-import junit.framework.Assert;
-import org.junit.Test;
-
 import io.mycat.SimpleCachePool;
 import io.mycat.cache.LayerCachePool;
 import io.mycat.config.loader.SchemaLoader;
@@ -35,7 +32,8 @@ import io.mycat.config.model.SystemConfig;
 import io.mycat.route.RouteResultset;
 import io.mycat.route.RouteStrategy;
 import io.mycat.route.factory.RouteStrategyFactory;
-import io.mycat.route.function.PartitionByRangeMod;
+import junit.framework.Assert;
+import org.junit.Test;
 
 import java.math.BigInteger;
 import java.sql.SQLNonTransientException;
@@ -45,8 +43,7 @@ public class PartitionByRangeModTest
 {
 
     @Test
-    public void test()
-    {
+    public void test()  {
         PartitionByRangeMod autoPartition = new PartitionByRangeMod();
         autoPartition.setMapFile("partition-range-mod.txt");
         autoPartition.init();
@@ -92,11 +89,11 @@ public class PartitionByRangeModTest
         String ruleFile = "/route/rule.xml";
         SchemaLoader schemaLoader = new XMLSchemaLoader(schemaFile, ruleFile);
         schemaMap = schemaLoader.getSchemas();
+        RouteStrategyFactory.init();
     }
 
     @Test
-    public void testRange() throws SQLNonTransientException
-    {
+    public void testRange() throws SQLNonTransientException {
         String sql = "select * from offer  where id between 2000000  and 4000001     order by id desc limit 100";
         SchemaConfig schema = schemaMap.get("TESTDB");
         RouteResultset rrs = routeStrategy.route(new SystemConfig(), schema, -1, sql, null,

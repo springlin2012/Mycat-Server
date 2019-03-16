@@ -7,29 +7,15 @@ import com.mongodb.DBObject;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
-//import java.net.MalformedURLException;
 import java.net.URL;
-import java.sql.Array;
-import java.sql.Blob;
-import java.sql.Clob;
-import java.sql.Date;
-import java.sql.NClob;
-import java.sql.Ref;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.RowId;
-import java.sql.SQLException;
-import java.sql.SQLWarning;
-import java.sql.SQLXML;
-import java.sql.Statement;
-import java.sql.Time;
-import java.sql.Timestamp;
-import java.sql.Types;
+import java.sql.*;
 import java.util.Calendar;
 import java.util.HashMap;
-//import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+
+//import java.net.MalformedURLException;
+//import java.util.HashMap;
 /**  
  * 功能详细描述
  * @author sohudo[http://blog.csdn.net/wind520]
@@ -382,8 +368,12 @@ public class MongoResultSet implements ResultSet
 
 	@Override
 	public Timestamp getTimestamp(String columnLabel) throws SQLException {
-		
-		return (Timestamp)getObject(columnLabel);//throw new UnsupportedOperationException();
+		Object obj = getObject(columnLabel);
+		if(obj instanceof java.util.Date){
+			java.util.Date d= (java.util.Date) obj;
+			return new Timestamp(d.getTime());
+		}
+		return (Timestamp)obj;//throw new UnsupportedOperationException();
 	}
 
 	@Override
@@ -1402,15 +1392,15 @@ public class MongoResultSet implements ResultSet
 
 	@Override
 	public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
-		
-		return null;
+		Object value = getObject(columnIndex);
+		return (T) MongoEmbeddedObjectProcessor.valueMapper(getField(columnIndex), value, type);
 	}
 
 	@Override
 	public <T> T getObject(String columnLabel, Class<T> type)
 			throws SQLException {
-		
-		return null;
+		Object value = getObject(columnLabel);
+		return (T) MongoEmbeddedObjectProcessor.valueMapper(columnLabel, value, type);
 	}
 	
 	

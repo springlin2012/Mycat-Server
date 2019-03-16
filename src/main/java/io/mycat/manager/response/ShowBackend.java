@@ -23,8 +23,6 @@
  */
 package io.mycat.manager.response;
 
-import java.nio.ByteBuffer;
-
 import io.mycat.MycatServer;
 import io.mycat.backend.BackendConnection;
 import io.mycat.backend.jdbc.JDBCConnection;
@@ -32,7 +30,6 @@ import io.mycat.backend.mysql.PacketUtil;
 import io.mycat.backend.mysql.nio.MySQLConnection;
 import io.mycat.config.Fields;
 import io.mycat.manager.ManagerConnection;
-import io.mycat.net.AbstractConnection;
 import io.mycat.net.BackendAIOConnection;
 import io.mycat.net.NIOProcessor;
 import io.mycat.net.mysql.EOFPacket;
@@ -43,6 +40,8 @@ import io.mycat.util.IntegerUtil;
 import io.mycat.util.LongUtil;
 import io.mycat.util.StringUtil;
 import io.mycat.util.TimeUtil;
+
+import java.nio.ByteBuffer;
 
 /**
  * 查询后端连接

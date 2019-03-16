@@ -1,20 +1,19 @@
 package io.mycat.route;
 
-import java.sql.SQLNonTransientException;
-import java.util.Map;
-
-import org.junit.Test;
-
+import io.mycat.MycatServer;
 import io.mycat.SimpleCachePool;
 import io.mycat.cache.LayerCachePool;
 import io.mycat.config.loader.SchemaLoader;
 import io.mycat.config.loader.xml.XMLSchemaLoader;
 import io.mycat.config.model.SchemaConfig;
 import io.mycat.config.model.SystemConfig;
-import io.mycat.route.RouteResultset;
-import io.mycat.route.RouteStrategy;
 import io.mycat.route.factory.RouteStrategyFactory;
+import io.mycat.server.parser.ServerParse;
 import junit.framework.Assert;
+import org.junit.Test;
+
+import java.sql.SQLNonTransientException;
+import java.util.Map;
 
 public class DruidMysqlSqlParserTest
 {
@@ -27,6 +26,7 @@ public class DruidMysqlSqlParserTest
 		String ruleFile = "/route/rule.xml";
 		SchemaLoader schemaLoader = new XMLSchemaLoader(schemaFile, ruleFile);
 		schemaMap = schemaLoader.getSchemas();
+		MycatServer.getInstance().getConfig().getSchemas().putAll(schemaMap);
         RouteStrategyFactory.init();
         routeStrategy = RouteStrategyFactory.getRouteStrategy("druidparser");
 	}
@@ -74,9 +74,24 @@ public class DruidMysqlSqlParserTest
         Assert.assertEquals(10, rrs.getNodes()[0].getLimitSize());
         Assert.assertEquals("dn1", rrs.getNodes()[0].getName());
 
+        sql = "select * from offer order by id desc limit 10 offset 5";
+        rrs = routeStrategy.route(new SystemConfig(), schema, -1, sql, null,
+                null, cachePool);
+        Assert.assertEquals(5, rrs.getLimitStart());
+        Assert.assertEquals(10, rrs.getLimitSize());
+        Assert.assertEquals(0, rrs.getNodes()[0].getLimitStart());
+        Assert.assertEquals(15, rrs.getNodes()[0].getLimitSize());
+        Assert.assertEquals("dn1", rrs.getNodes()[0].getName());
+        Assert.assertEquals("dn2", rrs.getNodes()[1].getName());
 	}
 
-
+	@Test
+	public void testLockTableSql() throws SQLNonTransientException{
+		String sql = "lock tables goods write";
+		SchemaConfig schema = schemaMap.get("TESTDB");
+		RouteResultset rrs = routeStrategy.route(new SystemConfig(), schema, ServerParse.LOCK, sql, null, null, cachePool);
+		Assert.assertEquals(3, rrs.getNodes().length);
+	}
 
 
 }

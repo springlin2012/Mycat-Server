@@ -23,14 +23,9 @@
  */
 package io.mycat.parser;
 
+import io.mycat.server.parser.*;
 import org.junit.Assert;
 import org.junit.Test;
-
-import io.mycat.server.parser.ServerParse;
-import io.mycat.server.parser.ServerParseSelect;
-import io.mycat.server.parser.ServerParseSet;
-import io.mycat.server.parser.ServerParseShow;
-import io.mycat.server.parser.ServerParseStart;
 
 /**
  * @author mycat
@@ -466,6 +461,33 @@ public class ServerParserTest {
         Assert.assertEquals(ServerParseSelect.OTHER, ServerParseSelect.parse(stmt, 6));
         stmt = "select last_insert_id(#\n\r) as 'a";
         Assert.assertEquals(ServerParseSelect.OTHER, ServerParseSelect.parse(stmt, 6));
+    }
+    
+    @Test
+    public void testLockTable() {
+    	Assert.assertEquals(ServerParse.LOCK, ServerParse.parse("lock tables ttt write;"));
+    	Assert.assertEquals(ServerParse.LOCK, ServerParse.parse(" lock tables ttt read;"));
+    	Assert.assertEquals(ServerParse.LOCK, ServerParse.parse("lock tables"));
+    }
+
+    @Test
+    public void testUnlockTable() {
+    	Assert.assertEquals(ServerParse.UNLOCK, ServerParse.parse("unlock tables"));
+    	Assert.assertEquals(ServerParse.UNLOCK, ServerParse.parse(" unlock	 tables"));
+    }
+    
+    @Test
+    public void testSetXAOn() {
+    	Assert.assertEquals(ServerParseSet.XA_FLAG_ON, ServerParseSet.parse("set xa=on", 3));
+    	Assert.assertEquals(ServerParseSet.XA_FLAG_ON, ServerParseSet.parse("set xa = on", 3));
+    	Assert.assertEquals(ServerParseSet.XA_FLAG_ON, ServerParseSet.parse("set xa \t\n\r = \t\n\r on", 3));
+    }
+    
+    @Test
+    public void testSetXAOff() {
+    	Assert.assertEquals(ServerParseSet.XA_FLAG_OFF, ServerParseSet.parse("set xa=off", 3));
+    	Assert.assertEquals(ServerParseSet.XA_FLAG_OFF, ServerParseSet.parse("set xa = off", 3));
+    	Assert.assertEquals(ServerParseSet.XA_FLAG_OFF, ServerParseSet.parse("set xa \t\n\r = \t\n\r off", 3));
     }
 
 }

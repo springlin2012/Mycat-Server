@@ -23,36 +23,38 @@
  */
 package io.mycat.config.loader.xml;
 
+import io.mycat.backend.datasource.PhysicalDBPool;
+import io.mycat.config.loader.SchemaLoader;
+import io.mycat.config.model.*;
+import io.mycat.config.model.rule.RuleConfig;
+import io.mycat.config.model.rule.TableRuleConfig;
+import io.mycat.config.util.ConfigException;
+import io.mycat.config.util.ConfigUtil;
+import io.mycat.route.function.AbstractPartitionAlgorithm;
+import io.mycat.route.function.TableRuleAware;
+import io.mycat.util.DecryptUtil;
+import io.mycat.util.ObjectUtil;
+import io.mycat.util.SplitUtil;
+import io.mycat.util.StringUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-
-import io.mycat.backend.datasource.PhysicalDBPool;
-import io.mycat.config.loader.SchemaLoader;
-import io.mycat.config.model.DBHostConfig;
-import io.mycat.config.model.DataHostConfig;
-import io.mycat.config.model.DataNodeConfig;
-import io.mycat.config.model.SchemaConfig;
-import io.mycat.config.model.SystemConfig;
-import io.mycat.config.model.TableConfig;
-import io.mycat.config.model.TableConfigMap;
-import io.mycat.config.model.rule.TableRuleConfig;
-import io.mycat.config.util.ConfigException;
-import io.mycat.config.util.ConfigUtil;
-import io.mycat.util.DecryptUtil;
-import io.mycat.util.SplitUtil;
-
 /**
  * @author mycat
  */
 @SuppressWarnings("unchecked")
 public class XMLSchemaLoader implements SchemaLoader {
+	
+	private static final Logger LOGGER = LoggerFactory.getLogger(XMLSchemaLoader.class);
 	
 	private final static String DEFAULT_DTD = "/schema.dtd";
 	private final static String DEFAULT_XML = "/schema.xml";
@@ -135,6 +137,10 @@ public class XMLSchemaLoader implements SchemaLoader {
 		}
 	}
 
+	/**
+	 * 加载所有的Schema
+	 * @param root
+	 */
 	private void loadSchemas(Element root) {
 		NodeList list = root.getElementsByTagName("schema");
 		for (int i = 0, n = list.getLength(); i < n; i++) {
@@ -293,6 +299,7 @@ public class XMLSchemaLoader implements SchemaLoader {
 		// Map<String, TableConfig> tables = new HashMap<String, TableConfig>();
 		
 		// 支持表名中包含引号[`] BEN GONG
+		final String schemaName = node.getAttribute("name");
 		Map<String, TableConfig> tables = new TableConfigMap();
 		NodeList nodeList = node.getElementsByTagName("table");
 		for (int i = 0; i < nodeList.getLength(); i++) {
@@ -358,14 +365,40 @@ public class XMLSchemaLoader implements SchemaLoader {
 			String subTables = tableElement.getAttribute("subTables");
 			
 			for (int j = 0; j < tableNames.length; j++) {
+
 				String tableName = tableNames[j];
+				TableRuleConfig	tableRuleConfig=tableRule ;
+				  if(tableRuleConfig!=null) {
+				  	//对于实现TableRuleAware的function进行特殊处理  根据每个表新建个实例
+					  RuleConfig rule= tableRuleConfig.getRule();
+					  if(rule.getRuleAlgorithm() instanceof TableRuleAware)  {
+						  //因为ObjectUtil.copyObject是深拷贝,所以会把crc32的算法也拷贝一份状态,而不是公用一个分片数
+						  tableRuleConfig = (TableRuleConfig) ObjectUtil.copyObject(tableRuleConfig);
+						  String name = tableRuleConfig.getName();
+						  String newRuleName = getNewRuleName(schemaName, tableName, name);
+						  tableRuleConfig.setName(newRuleName);
+						  TableRuleAware tableRuleAware = (TableRuleAware) tableRuleConfig.getRule().getRuleAlgorithm();
+						  tableRuleAware.setRuleName(newRuleName);
+						  tableRules.put(newRuleName, tableRuleConfig);
+					  }
+				  }
+
 				TableConfig table = new TableConfig(tableName, primaryKey,
 						autoIncrement, needAddLimit, tableType, dataNode,
 						getDbType(dataNode),
-						(tableRule != null) ? tableRule.getRule() : null,
+						(tableRuleConfig != null) ? tableRuleConfig.getRule() : null,
 						ruleRequired, null, false, null, null,subTables);
-				
+				//因为需要等待TableConfig构造完毕才可以拿到dataNode节点数量,所以Rule构造延后到此处 @cjw
+				if ((tableRuleConfig != null) && (tableRuleConfig.getRule().getRuleAlgorithm() instanceof TableRuleAware)) {
+					AbstractPartitionAlgorithm newRuleAlgorithm = tableRuleConfig.getRule().getRuleAlgorithm();
+					((TableRuleAware)newRuleAlgorithm).setTableConfig(table);
+					newRuleAlgorithm.init();
+				}
 				checkDataNodeExists(table.getDataNodes());
+				// 检查分片表分片规则配置是否合法
+				if(table.getRule() != null) {
+					checkRuleSuitTable(table);
+				}
 				
 				if (distTableDns) {
 					distributeDataNodes(table.getDataNodes());
@@ -385,6 +418,10 @@ public class XMLSchemaLoader implements SchemaLoader {
 			}
 		}
 		return tables;
+	}
+
+	private String getNewRuleName(String schemaName, String tableName, String name) {
+		return name + "_" + schemaName + "_" + tableName;
 	}
 
 	/**
@@ -506,7 +543,54 @@ public class XMLSchemaLoader implements SchemaLoader {
 			}
 		}
 	}
+	
+	/**
+	 * 检查分片表分片规则配置, 目前主要检查分片表分片算法定义与分片dataNode是否匹配<br>
+	 * 例如分片表定义如下:<br>
+	 * {@code
+	 * <table name="hotnews" primaryKey="ID" autoIncrement="true" dataNode="dn1,dn2"
+			   rule="mod-long" />
+	 * }
+	 * <br>
+	 * 分片算法如下:<br>
+	 * {@code
+	 * <function name="mod-long" class="io.mycat.route.function.PartitionByMod">
+		<!-- how many data nodes -->
+		<property name="count">3</property>
+	   </function>
+	 * }
+	 * <br>
+	 * shard table datanode(2) < function count(3) 此时检测为不匹配
+	 */
+	private void checkRuleSuitTable(TableConfig tableConf) {
+		AbstractPartitionAlgorithm function = tableConf.getRule().getRuleAlgorithm();
+		int suitValue = function.suitableFor(tableConf);
+		switch(suitValue) {
+			case -1:
+				// 少节点,给提示并抛异常
+				throw new ConfigException("Illegal table conf : table [ " + tableConf.getName() + " ] rule function [ "
+						+ tableConf.getRule().getFunctionName() + " ] partition size : " + tableConf.getRule().getRuleAlgorithm().getPartitionNum() + " > table datanode size : "
+						+ tableConf.getDataNodes().size() + ", please make sure table datanode size = function partition size");
+			case 0:
+				// table datanode size == rule function partition size
+				break;
+			case 1:
+				// 有些节点是多余的,给出warn log
+				LOGGER.warn("table conf : table [ {} ] rule function [ {} ] partition size : {} < table datanode size : {} , this cause some datanode to be redundant", 
+						new String[]{
+								tableConf.getName(),
+								tableConf.getRule().getFunctionName(),
+								String.valueOf(tableConf.getRule().getRuleAlgorithm().getPartitionNum()),
+								String.valueOf(tableConf.getDataNodes().size())
+						});
+				break;
+		}
+	}
 
+	/**
+	 * 加载所有的DataNode
+	 * @param root
+	 */
 	private void loadDataNodes(Element root) {
 		//读取DataNode分支
 		NodeList list = root.getElementsByTagName("dataNode");
@@ -581,6 +665,8 @@ public class XMLSchemaLoader implements SchemaLoader {
 		if (!dataHosts.containsKey(host)) {
 			throw new ConfigException("dataNode " + dnName + " reference dataHost:" + host + " not exists!");
 		}
+
+		dataHosts.get(host).addDataNode(conf.getName());
 		dataNodes.put(conf.getName(), conf);
 	}
 
@@ -589,18 +675,20 @@ public class XMLSchemaLoader implements SchemaLoader {
 	}
 
 	private DBHostConfig createDBHostConf(String dataHost, Element node,
-			String dbType, String dbDriver, int maxCon, int minCon, String filters, long logTime) {
-		
+										  String dbType, String dbDriver, int maxCon, int minCon, String filters, long logTime) {
+
 		String nodeHost = node.getAttribute("host");
 		String nodeUrl = node.getAttribute("url");
 		String user = node.getAttribute("user");
 		String password = node.getAttribute("password");
 		String usingDecrypt = node.getAttribute("usingDecrypt");
-		String passwordEncryty= DecryptUtil.DBHostDecrypt(usingDecrypt, nodeHost, user, password);
-		
+		boolean useSSL = Boolean.valueOf(node.getAttribute("useSSL"));
+
+		String passwordEncryty = DecryptUtil.DBHostDecrypt(usingDecrypt, nodeHost, user, password);
+
 		String weightStr = node.getAttribute("weight");
-		int weight = "".equals(weightStr) ? PhysicalDBPool.WEIGHT : Integer.parseInt(weightStr) ;
-		
+		int weight = "".equals(weightStr) ? PhysicalDBPool.WEIGHT : Integer.parseInt(weightStr);
+
 		String ip = null;
 		int port = 0;
 		if (empty(nodeHost) || empty(nodeUrl) || empty(user)) {
@@ -625,108 +713,140 @@ public class XMLSchemaLoader implements SchemaLoader {
 			port = url.getPort();
 		}
 
-		DBHostConfig conf = new DBHostConfig(nodeHost, ip, port, nodeUrl, user, passwordEncryty,password);
+		DBHostConfig conf = new DBHostConfig(nodeHost, ip, port, nodeUrl, user, passwordEncryty,password,useSSL);
 		conf.setDbType(dbType);
 		conf.setMaxCon(maxCon);
 		conf.setMinCon(minCon);
 		conf.setFilters(filters);
 		conf.setLogTime(logTime);
-		conf.setWeight(weight); 	//新增权重
+		conf.setWeight(weight);    //新增权重
 		return conf;
 	}
 
-	private void loadDataHosts(Element root) {
-		NodeList list = root.getElementsByTagName("dataHost");
-		for (int i = 0, n = list.getLength(); i < n; ++i) {
-			
-			Element element = (Element) list.item(i);
-			String name = element.getAttribute("name");
-			//判断是否重复
-			if (dataHosts.containsKey(name)) {
-				throw new ConfigException("dataHost name " + name + "duplicated!");
-			}
-			//读取最大连接数
-			int maxCon = Integer.parseInt(element.getAttribute("maxCon"));
-			//读取最小连接数
-			int minCon = Integer.parseInt(element.getAttribute("minCon"));
-			/**
-			 * 读取负载均衡配置
-			 * 1. balance="0", 不开启分离机制，所有读操作都发送到当前可用的 writeHost 上。
-			 * 2. balance="1"，全部的 readHost 和 stand by writeHost 参不 select 的负载均衡
-			 * 3. balance="2"，所有读操作都随机的在 writeHost、readhost 上分发。
-			 * 4. balance="3"，所有读请求随机的分发到 wiriterHost 对应的 readhost 执行，writerHost 不负担读压力
-			 */
-			int balance = Integer.parseInt(element.getAttribute("balance"));
-			/**
-			 * 读取切换类型
-			 * -1 表示不自动切换
-			 * 1 默认值，自动切换
-			 * 2 基于MySQL主从同步的状态决定是否切换
-			 * 心跳询句为 show slave status
-			 * 3 基于 MySQL galary cluster 的切换机制
-			 */
-			String switchTypeStr = element.getAttribute("switchType");
-			int switchType = switchTypeStr.equals("") ? -1 : Integer.parseInt(switchTypeStr);
-			//读取从延迟界限
-			String slaveThresholdStr = element.getAttribute("slaveThreshold");
-			int slaveThreshold = slaveThresholdStr.equals("") ? -1 : Integer.parseInt(slaveThresholdStr);
-			
-			//如果 tempReadHostAvailable 设置大于 0 则表示写主机如果挂掉， 临时的读服务依然可用
-			String tempReadHostAvailableStr = element.getAttribute("tempReadHostAvailable");
-			boolean tempReadHostAvailable = !tempReadHostAvailableStr.equals("") && Integer.parseInt(tempReadHostAvailableStr) > 0;
-			/**
-			 * 读取 写类型
-			 * 这里只支持 0 - 所有写操作仅配置的第一个 writeHost
-			 */
-			String writeTypStr = element.getAttribute("writeType");
-			int writeType = "".equals(writeTypStr) ? PhysicalDBPool.WRITE_ONLYONE_NODE : Integer.parseInt(writeTypStr);
+	/**
+	 * 加载所有的DataHost
+	 * @param root
+	 */
+    private void loadDataHosts(Element root) {
+        NodeList list = root.getElementsByTagName("dataHost");
+        for (int i = 0, n = list.getLength(); i < n; ++i) {
+
+            Element element = (Element) list.item(i);
+            String name = element.getAttribute("name");
+            //判断是否重复
+            if (dataHosts.containsKey(name)) {
+                throw new ConfigException("dataHost name " + name + "duplicated!");
+            }
+            //读取最大连接数
+            int maxCon = Integer.parseInt(element.getAttribute("maxCon"));
+            //读取最小连接数
+            int minCon = Integer.parseInt(element.getAttribute("minCon"));
+            /**
+             * 读取负载均衡配置
+             * 1. balance="0", 不开启分离机制，所有读操作都发送到当前可用的 writeHost 上。
+             * 2. balance="1"，全部的 readHost 和 stand by writeHost 参不 select 的负载均衡
+             * 3. balance="2"，所有读操作都随机的在 writeHost、readhost 上分发。
+             * 4. balance="3"，所有读请求随机的分发到 wiriterHost 对应的 readhost 执行，writerHost 不负担读压力
+             */
+            int balance = Integer.parseInt(element.getAttribute("balance"));
+            /**
+             * 读取切换类型
+             * -1 表示不自动切换
+             * 1 默认值，自动切换
+             * 2 基于MySQL主从同步的状态决定是否切换
+             * 心跳询句为 show slave status
+             * 3 基于 MySQL galary cluster 的切换机制
+             */
+            String switchTypeStr = element.getAttribute("switchType");
+            int switchType = switchTypeStr.equals("") ? -1 : Integer.parseInt(switchTypeStr);
+            //读取从延迟界限
+            String slaveThresholdStr = element.getAttribute("slaveThreshold");
+            int slaveThreshold = slaveThresholdStr.equals("") ? -1 : Integer.parseInt(slaveThresholdStr);
+
+            //如果 tempReadHostAvailable 设置大于 0 则表示写主机如果挂掉， 临时的读服务依然可用
+            String tempReadHostAvailableStr = element.getAttribute("tempReadHostAvailable");
+            boolean tempReadHostAvailable = !tempReadHostAvailableStr.equals("") && Integer.parseInt(tempReadHostAvailableStr) > 0;
+            /**
+             * 读取 写类型
+             * 这里只支持 0 - 所有写操作仅配置的第一个 writeHost
+             */
+            String writeTypStr = element.getAttribute("writeType");
+            int writeType = "".equals(writeTypStr) ? PhysicalDBPool.WRITE_ONLYONE_NODE : Integer.parseInt(writeTypStr);
 
 
-			String dbDriver = element.getAttribute("dbDriver");
-			String dbType = element.getAttribute("dbType");
-			String filters = element.getAttribute("filters");
-			String logTimeStr = element.getAttribute("logTime");
-			long logTime = "".equals(logTimeStr) ? PhysicalDBPool.LONG_TIME : Long.parseLong(logTimeStr) ;
-			//读取心跳语句
-			String heartbeatSQL = element.getElementsByTagName("heartbeat").item(0).getTextContent();
-			//读取 初始化sql配置,用于oracle
-			NodeList connectionInitSqlList = element.getElementsByTagName("connectionInitSql");
-			String initConSQL = null;
-			if (connectionInitSqlList.getLength() > 0) {
-				initConSQL = connectionInitSqlList.item(0).getTextContent();
-			}
-			//读取writeHost
-			NodeList writeNodes = element.getElementsByTagName("writeHost");
-			DBHostConfig[] writeDbConfs = new DBHostConfig[writeNodes.getLength()];
-			Map<Integer, DBHostConfig[]> readHostsMap = new HashMap<Integer, DBHostConfig[]>(2);
-			for (int w = 0; w < writeDbConfs.length; w++) {
-				Element writeNode = (Element) writeNodes.item(w);
-				writeDbConfs[w] = createDBHostConf(name, writeNode, dbType, dbDriver, maxCon, minCon,filters,logTime);
-				NodeList readNodes = writeNode.getElementsByTagName("readHost");
-				//读取对应的每一个readHost
-				if (readNodes.getLength() != 0) {
-					DBHostConfig[] readDbConfs = new DBHostConfig[readNodes.getLength()];
-					for (int r = 0; r < readDbConfs.length; r++) {
-						Element readNode = (Element) readNodes.item(r);
-						readDbConfs[r] = createDBHostConf(name, readNode, dbType, dbDriver, maxCon, minCon,filters, logTime);
-					}
-					readHostsMap.put(w, readDbConfs);
-				}
-			}
-
-			DataHostConfig hostConf = new DataHostConfig(name, dbType, dbDriver, 
-					writeDbConfs, readHostsMap, switchType, slaveThreshold, tempReadHostAvailable);		
+            String dbDriver = element.getAttribute("dbDriver");
+            String dbType = element.getAttribute("dbType");
+            String filters = element.getAttribute("filters");
+            String logTimeStr = element.getAttribute("logTime");
+            String slaveIDs = element.getAttribute("slaveIDs");
+            String maxRetryCountStr = element.getAttribute("maxRetryCount");
+            int maxRetryCount;
+            if (StringUtil.isEmpty(maxRetryCountStr)) {
+                maxRetryCount = 3;
+            } else {
+                maxRetryCount = Integer.valueOf(maxRetryCountStr);
+            }
+            long logTime = "".equals(logTimeStr) ? PhysicalDBPool.LONG_TIME : Long.parseLong(logTimeStr);
 			
-			hostConf.setMaxCon(maxCon);
-			hostConf.setMinCon(minCon);
-			hostConf.setBalance(balance);
-			hostConf.setWriteType(writeType);
-			hostConf.setHearbeatSQL(heartbeatSQL);
-			hostConf.setConnectionInitSql(initConSQL);
-			hostConf.setFilters(filters);
-			hostConf.setLogTime(logTime);
-			dataHosts.put(hostConf.getName(), hostConf);
-		}
-	}
+            String notSwitch =  element.getAttribute("notSwitch");
+			if(StringUtil.isEmpty(notSwitch)) {
+				notSwitch = DataHostConfig.CAN_SWITCH_DS;
+			}
+            //读取心跳语句
+            String heartbeatSQL = element.getElementsByTagName("heartbeat").item(0).getTextContent();
+            //读取 初始化sql配置,用于oracle
+            NodeList connectionInitSqlList = element.getElementsByTagName("connectionInitSql");
+            String initConSQL = null;
+            if (connectionInitSqlList.getLength() > 0) {
+                initConSQL = connectionInitSqlList.item(0).getTextContent();
+            }
+            //读取writeHost
+            NodeList writeNodes = element.getElementsByTagName("writeHost");
+            DBHostConfig[] writeDbConfs = new DBHostConfig[writeNodes.getLength()];
+            Map<Integer, DBHostConfig[]> readHostsMap = new HashMap<Integer, DBHostConfig[]>(2);
+            Set<String> writeHostNameSet = new HashSet<String>(writeNodes.getLength());
+            for (int w = 0; w < writeDbConfs.length; w++) {
+                Element writeNode = (Element) writeNodes.item(w);
+                writeDbConfs[w] = createDBHostConf(name, writeNode, dbType, dbDriver, maxCon, minCon, filters, logTime);
+                if (writeHostNameSet.contains(writeDbConfs[w].getHostName())) {
+                    throw new ConfigException("writeHost " + writeDbConfs[w].getHostName() + " duplicated!");
+                } else {
+                    writeHostNameSet.add(writeDbConfs[w].getHostName());
+                }
+                NodeList readNodes = writeNode.getElementsByTagName("readHost");
+                //读取对应的每一个readHost
+                if (readNodes.getLength() != 0) {
+                    DBHostConfig[] readDbConfs = new DBHostConfig[readNodes.getLength()];
+                    Set<String> readHostNameSet = new HashSet<String>(readNodes.getLength());
+                    for (int r = 0; r < readDbConfs.length; r++) {
+                        Element readNode = (Element) readNodes.item(r);
+                        readDbConfs[r] = createDBHostConf(name, readNode, dbType, dbDriver, maxCon, minCon, filters, logTime);
+                        if (readHostNameSet.contains(readDbConfs[r].getHostName())) {
+                            throw new ConfigException("readHost " + readDbConfs[r].getHostName() + " duplicated!");
+                        } else {
+                            readHostNameSet.add(readDbConfs[r].getHostName());
+                        }
+                    }
+                    readHostsMap.put(w, readDbConfs);
+                }
+            }
+
+            DataHostConfig hostConf = new DataHostConfig(name, dbType, dbDriver,
+                    writeDbConfs, readHostsMap, switchType, slaveThreshold, tempReadHostAvailable);
+
+            hostConf.setMaxCon(maxCon);
+            hostConf.setMinCon(minCon);
+            hostConf.setBalance(balance);
+            hostConf.setWriteType(writeType);
+            hostConf.setHearbeatSQL(heartbeatSQL);
+            hostConf.setConnectionInitSql(initConSQL);
+            hostConf.setFilters(filters);
+            hostConf.setLogTime(logTime);
+            hostConf.setSlaveIDs(slaveIDs);
+			hostConf.setNotSwitch(notSwitch);
+            hostConf.setMaxRetryCount(maxRetryCount);
+            dataHosts.put(hostConf.getName(), hostConf);
+        }
+    }
 
 }

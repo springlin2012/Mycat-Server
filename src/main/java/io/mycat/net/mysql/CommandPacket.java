@@ -23,18 +23,19 @@
  */
 package io.mycat.net.mysql;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
-
 import io.mycat.backend.mysql.BufferUtil;
 import io.mycat.backend.mysql.MySQLMessage;
 import io.mycat.backend.mysql.StreamUtil;
 import io.mycat.net.BackendAIOConnection;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+
 /**
- * From client to server whenever the client wants the server to do something.
+ * 命令包 MySQL内部协议
+ *
+ * 从客户端到服务器，当客户端希望服务器做某事时。
  * 
  * <pre>
  * Bytes         Name
@@ -115,11 +116,21 @@ public class CommandPacket extends MySQLPacket {
     @Override
     public void write(BackendAIOConnection c) {
         ByteBuffer buffer = c.allocate();
-        BufferUtil.writeUB3(buffer, calcPacketSize());
-        buffer.put(packetId);
-        buffer.put(command);
-        buffer = c.writeToBuffer(arg, buffer);
-        c.write(buffer);
+        try {    
+	        BufferUtil.writeUB3(buffer, calcPacketSize());
+	        buffer.put(packetId);
+	        buffer.put(command);
+	        buffer = c.writeToBuffer(arg, buffer);
+	        c.write(buffer);	        
+        } catch(java.nio.BufferOverflowException e1) { 
+        	//fixed issues #98 #1072
+        	buffer =  c.checkWriteBuffer(buffer, c.getPacketHeaderSize() + calcPacketSize(), false);
+	        BufferUtil.writeUB3(buffer, calcPacketSize());
+	        buffer.put(packetId);
+	        buffer.put(command);
+	        buffer = c.writeToBuffer(arg, buffer);
+	        c.write(buffer);
+        }
     }
 
     @Override

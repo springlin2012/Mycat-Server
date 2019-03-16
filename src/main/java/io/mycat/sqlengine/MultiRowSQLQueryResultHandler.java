@@ -1,13 +1,11 @@
 package io.mycat.sqlengine;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.alibaba.fastjson.JSON;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 当SQLJob的结果有多行时，利用该处理器进行处理
@@ -36,9 +34,10 @@ public class MultiRowSQLQueryResultHandler extends OneRawSQLQueryResultHandler{
 	}
 
 	@Override
-	public void finished(String dataNode, boolean failed) {
+	public void finished(String dataNode, boolean failed, String errorMsg) {
 		SQLQueryResult<List<Map<String, String>>> queryResult = 
 				new SQLQueryResult<List<Map<String, String>>>(this.resultRows, !failed);
+		queryResult.setErrMsg(errorMsg);
 		if(callback != null)
 			this.callback.onResult(queryResult); // callback 是构造函数传进来，在得到结果是进行回调
 		else

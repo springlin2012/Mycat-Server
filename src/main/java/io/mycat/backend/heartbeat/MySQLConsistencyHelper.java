@@ -27,18 +27,16 @@ import io.mycat.server.interceptor.impl.GlobalTableUtil;
 import io.mycat.sqlengine.SQLJob;
 import io.mycat.sqlengine.SQLQueryResult;
 import io.mycat.sqlengine.SQLQueryResultListener;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.alibaba.fastjson.JSON;
-
 /**
+ * MySQL一致性助手
  * @author digdeep@126.com
  */
 public class MySQLConsistencyHelper implements SQLQueryResultListener<SQLQueryResult<Map<String, String>>> {
@@ -54,8 +52,7 @@ public class MySQLConsistencyHelper implements SQLQueryResultListener<SQLQueryRe
         this.retryTime.set(RETRY_TIMES);
     }
     
-    public MySQLConsistencyHelper(MySQLConsistencyChecker heartbeat, 
-    								SQLJob sqlJob, int retryTime) {
+    public MySQLConsistencyHelper(MySQLConsistencyChecker heartbeat, SQLJob sqlJob, int retryTime) {
     	this.heartbeat = heartbeat;
         this.sqlJob = sqlJob;
         if(retryTime > 0 && retryTime < 10)
@@ -68,9 +65,10 @@ public class MySQLConsistencyHelper implements SQLQueryResultListener<SQLQueryRe
     public void onResult(SQLQueryResult<Map<String, String>> result) {
     	// {"dataNode":"db2","result":{"max_timestamp":"1450423751170"},"success":true}
     	// {"dataNode":"db3","result":{"count(*)":"1"},"success":true}
-    	LOGGER.debug("resultresultresultresult:" + JSON.toJSONString(result));
+//    	LOGGER.debug("result:" + JSON.toJSONString(result));
     	Map<String, String> rowMap = null;
-    	String count = null; String innerCol = null;
+    	String count = null;
+    	String innerCol = null;
     	String maxTimestamp = null;
     	if(result != null)
     		rowMap = result.getResult();

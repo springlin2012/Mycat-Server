@@ -27,7 +27,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.FileInputStream;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
 /**
  * @author mycat
@@ -59,7 +61,7 @@ public class CharsetUtil {
                INDEX_TO_CHARSET.put(Integer.parseInt((String) index), prop.getProperty((String) index));
             }
         } catch (Exception e) {
-            logger.error(e.getMessage());
+            logger.error("error:",e);
         }
         
         // charset --> index

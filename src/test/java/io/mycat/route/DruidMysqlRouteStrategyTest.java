@@ -1,32 +1,22 @@
 package io.mycat.route;
 
-import java.sql.SQLNonTransientException;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Set;
-
-import org.junit.Before;
-import org.junit.Test;
-
 import com.alibaba.druid.sql.ast.SQLStatement;
 import com.alibaba.druid.sql.dialect.mysql.parser.MySqlStatementParser;
-
+import io.mycat.MycatServer;
 import io.mycat.SimpleCachePool;
 import io.mycat.cache.LayerCachePool;
 import io.mycat.config.loader.SchemaLoader;
 import io.mycat.config.loader.xml.XMLSchemaLoader;
 import io.mycat.config.model.SchemaConfig;
 import io.mycat.config.model.SystemConfig;
-import io.mycat.route.RouteResultset;
-import io.mycat.route.RouteResultsetNode;
-import io.mycat.route.RouteStrategy;
 import io.mycat.route.factory.RouteStrategyFactory;
 import io.mycat.server.parser.ServerParse;
 import junit.framework.Assert;
 import junit.framework.TestCase;
+import org.junit.Test;
+
+import java.sql.SQLNonTransientException;
+import java.util.*;
 
 public class DruidMysqlRouteStrategyTest extends TestCase {
     protected Map<String, SchemaConfig> schemaMap;
@@ -38,6 +28,7 @@ public class DruidMysqlRouteStrategyTest extends TestCase {
         String ruleFile = "/route/rule.xml";
         SchemaLoader schemaLoader = new XMLSchemaLoader(schemaFile, ruleFile);
         schemaMap = schemaLoader.getSchemas();
+        MycatServer.getInstance().getConfig().getSchemas().putAll(schemaMap);
         RouteStrategyFactory.init();
         routeStrategy = RouteStrategyFactory.getRouteStrategy("druidparser");
     }
@@ -65,8 +56,7 @@ public class DruidMysqlRouteStrategyTest extends TestCase {
         Assert.assertEquals(false, rrs.isCacheAble());
         Assert.assertEquals(-1l, rrs.getLimitSize());
         Assert.assertEquals("detail_dn15", rrs.getNodes()[0].getName());
-        Assert.assertEquals(
-                "inSErt into offer_detail (`offer_id`, gmt) values (123,now())",
+        Assert.assertEquals("INSERT INTO offer_detail (`offer_id`, gmt)\nVALUES ('123', now())",
                 rrs.getNodes()[0].getStatement());
 
         sql = "inSErt into offer_detail ( gmt) values (now())";
@@ -85,7 +75,7 @@ public class DruidMysqlRouteStrategyTest extends TestCase {
         Assert.assertEquals(-1l, rrs.getLimitSize());
         Assert.assertEquals("detail_dn15", rrs.getNodes()[0].getName());
         Assert.assertEquals(
-                "inSErt into offer_detail (offer_id, gmt) values (123,now())",
+                "INSERT INTO offer_detail (offer_id, gmt)\nVALUES ('123', now())",
                 rrs.getNodes()[0].getStatement());
 
         sql = "insert into offer(group_id,offer_id,member_id)values(234,123,'abc')";
@@ -96,7 +86,7 @@ public class DruidMysqlRouteStrategyTest extends TestCase {
         Assert.assertEquals(-1l, rrs.getLimitSize());
         Assert.assertEquals("offer_dn12", rrs.getNodes()[0].getName());
         Assert.assertEquals(
-                "insert into offer(group_id,offer_id,member_id)values(234,123,'abc')",
+                "INSERT INTO offer (group_id, offer_id, member_id)\nVALUES (234, 123, 'abc')",
                 rrs.getNodes()[0].getStatement());
 
 
@@ -170,7 +160,7 @@ public class DruidMysqlRouteStrategyTest extends TestCase {
         schema = schemaMap.get("TESTDB");
         rrs = routeStrategy.route(new SystemConfig(), schema, -1, sql, null, null, cachePool);
         Assert.assertEquals(1, rrs.getNodes().length);
-        Assert.assertEquals(true, rrs.isCacheAble());
+        Assert.assertEquals(false, rrs.isCacheAble());   // 全局表涉及到多个节点时,不缓存路由结果
 
     }
 
@@ -403,7 +393,7 @@ public class DruidMysqlRouteStrategyTest extends TestCase {
         }
         Assert.assertEquals(
                 true,
-                err.startsWith("parent relation column can't be updated ORDERS->CUSTOMER_ID"));
+                err.startsWith("Parent relevant column can't be updated ORDERS->CUSTOMER_ID"));
 
         // route by parent rule ,update sql
         sql = "update orders set id=1 ,name='aaa' where customer_id=2000001";
@@ -906,8 +896,8 @@ public class DruidMysqlRouteStrategyTest extends TestCase {
         Assert.assertEquals(false, rrs.isCacheAble());
         Assert.assertEquals("dn1", rrs.getNodes()[0].getName());
         Assert.assertEquals("dn2", rrs.getNodes()[1].getName());
-        String node1Sql = formatSql("insert into employee (id,name,sharding_id) values(1,'testonly',10000)");
-        String node2Sql = formatSql("insert into employee (id,name,sharding_id) values(2,'testonly',10010)");
+        String node1Sql = formatSql("INSERT INTO employee (id, name, sharding_id)\nVALUES (1, 'testonly', '10000')");
+        String node2Sql = formatSql("INSERT INTO employee (id, name, sharding_id)\nVALUES (2, 'testonly', '10010')");
         RouteResultsetNode[] nodes = rrs.getNodes();
         Assert.assertEquals(node1Sql, nodes[0].getStatement());
         Assert.assertEquals(node2Sql, nodes[1].getStatement());
@@ -935,7 +925,7 @@ public class DruidMysqlRouteStrategyTest extends TestCase {
         Assert.assertEquals(1, rrs.getNodes().length);
         Assert.assertEquals("dn1", rrs.getNodes()[0].getName());
 
-        //insert ... on duplicate key ,partion key can't be updated
+        //insert ... on duplicate key ,sharding key can't be updated
         sql = "insert into employee (id,name,sharding_id) values(1,'testonly',10000) " +
                 "on duplicate key update name=VALUES(name),id = VALUES(id),sharding_id = VALUES(sharding_id)";
 
@@ -943,7 +933,7 @@ public class DruidMysqlRouteStrategyTest extends TestCase {
             rrs = routeStrategy.route(new SystemConfig(), schema,
                     ServerParse.SELECT, sql, null, null, cachePool);
         } catch (Exception e) {
-            Assert.assertEquals("partion key can't be updated: EMPLOYEE -> SHARDING_ID", e.getMessage());
+            Assert.assertEquals("Sharding column can't be updated: EMPLOYEE -> SHARDING_ID", e.getMessage());
         }
 
 

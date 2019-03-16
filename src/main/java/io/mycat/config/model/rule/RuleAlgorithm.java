@@ -24,6 +24,7 @@
 package io.mycat.config.model.rule;
 
 /**
+ * 分片算法
  * @author mycat
  */
 public interface RuleAlgorithm {
@@ -41,7 +42,7 @@ public interface RuleAlgorithm {
 	 * columnValue is column's value
 	 * @return never null
 	 */
-	Integer calculate(String columnValue);
+	Integer calculate(String columnValue) ;
 	
-	Integer[] calculateRange(String beginValue,String endValue);
+	Integer[] calculateRange(String beginValue,String endValue) ;
 }

@@ -1,9 +1,6 @@
-
-
 package io.mycat.memory.unsafe.utils.sort;
 
 import com.google.common.annotations.VisibleForTesting;
-
 import io.mycat.MycatServer;
 import io.mycat.memory.unsafe.Platform;
 import io.mycat.memory.unsafe.array.LongArray;
@@ -23,14 +20,21 @@ import java.util.LinkedList;
 import java.util.Queue;
 
 /**
+ * 非安全的外部排序器
  * External sorter based on {@link UnsafeInMemorySorter}.
  */
 public final class UnsafeExternalSorter extends MemoryConsumer {
 
   private final Logger logger = LoggerFactory.getLogger(UnsafeExternalSorter.class);
 
+  /**
+   * 前缀比较器，用于排序
+   */
   @Nullable
   private final PrefixComparator prefixComparator;
+  /**
+   * 记录比较器，用于数据排序
+   */
   @Nullable
   private final RecordComparator recordComparator;
 
@@ -351,7 +355,7 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
       LongArray array;
       try {
         // could trigger spilling
-        array = allocateArray(used / 8 * 2);
+        array = allocateLongArray(used / 8 * 2);
       } catch (OutOfMemoryError e) {
         // should have trigger spilling
         if (!inMemSorter.hasSpaceForAnotherRecord()) {
@@ -362,7 +366,7 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
       }
       // check if spilling is triggered or not
       if (inMemSorter.hasSpaceForAnotherRecord()) {
-        freeArray(array);
+        freeLongArray(array);
       } else {
         inMemSorter.expandPointerArray(array);
       }
@@ -431,7 +435,7 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
      */
     final Object base = currentPage.getBaseObject();
     /**
-     * 通过currentPage和pageCursor页内偏移量，code一个地址处理，该条记录存数据的
+     * 通过currentPage和pageCursor页内偏移量，codec一个地址处理，该条记录存数据的
      * 存数据的起始位置
      */
     final long recordAddress = dataNodeMemoryManager.encodePageNumberAndOffset(currentPage,pageCursor);
@@ -655,8 +659,7 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
    */
   public UnsafeSorterIterator getIterator() throws IOException {
     /**
-     * 如果spillWriters为空说明，当前只有一个spil file文件
-     * 直接读取内存中即可
+     * 如果spillWriters为空说明，直接读取内存中即可
      */
     if (spillWriters.isEmpty()) {
       assert(inMemSorter != null);
@@ -684,8 +687,6 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
   }
 
   /**
-   * 非常重要的一个ChainedIterator，主要看如果实现合并操作的?
-   * 相当于设计模式中的组合模式
    * Chain multiple UnsafeSorterIterator together as single one.
    */
   static class ChainedIterator extends UnsafeSorterIterator {

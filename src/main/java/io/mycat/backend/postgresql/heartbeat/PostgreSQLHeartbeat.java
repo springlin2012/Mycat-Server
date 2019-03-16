@@ -1,17 +1,16 @@
 package io.mycat.backend.postgresql.heartbeat;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.concurrent.locks.ReentrantLock;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import io.mycat.backend.datasource.PhysicalDBPool;
 import io.mycat.backend.datasource.PhysicalDatasource;
 import io.mycat.backend.heartbeat.DBHeartbeat;
 import io.mycat.backend.postgresql.PostgreSQLDataSource;
 import io.mycat.config.model.DataHostConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class PostgreSQLHeartbeat extends DBHeartbeat {
 
@@ -178,7 +177,7 @@ public class PostgreSQLHeartbeat extends DBHeartbeat {
 								if (Integer.valueOf(0).equals(theSourceHB.getSlaveBehindMaster())) {
 									LOGGER.info("try to switch datasource ,slave is synchronized to master "
 											+ theSource.getConfig());
-									pool.switchSource(nextId, true, reason);
+									pool.switchSourceOrVoted(nextId, true, reason);
 									break;
 								} else {
 									LOGGER.warn(
@@ -189,7 +188,7 @@ public class PostgreSQLHeartbeat extends DBHeartbeat {
 								// normal switch
 								LOGGER.info("try to switch datasource ,not checked slave synchronize status "
 										+ theSource.getConfig());
-								pool.switchSource(nextId, true, reason);
+								pool.switchSourceOrVoted(nextId, true, reason);
 								break;
 							}
 
@@ -209,7 +208,7 @@ public class PostgreSQLHeartbeat extends DBHeartbeat {
 
 	private void setError(PostgreSQLDetector detector) {
 		// should continues check error status
-		if (++errorCount < maxRetryCount) {
+		if (			this.errorCount.incrementAndGet() < maxRetryCount) {
 
 			if (detector != null && !detector.isQuit()) {
 				heartbeat(); // error count not enough, heart beat again
@@ -221,7 +220,7 @@ public class PostgreSQLHeartbeat extends DBHeartbeat {
 			}
 
 			this.status = ERROR_STATUS;
-			this.errorCount = 0;
+			this.errorCount.set(0);
 
 		}
 	}
@@ -231,7 +230,7 @@ public class PostgreSQLHeartbeat extends DBHeartbeat {
 		switch (status) {
 		case DBHeartbeat.TIMEOUT_STATUS:
 			this.status = DBHeartbeat.INIT_STATUS;
-			this.errorCount = 0;
+			this.errorCount.set(0);
 			if (isStop.get()) {
 				detector.quit();
 			} else {
@@ -242,7 +241,7 @@ public class PostgreSQLHeartbeat extends DBHeartbeat {
 			break;
 		default:
 			this.status = OK_STATUS;
-			this.errorCount = 0;
+			this.errorCount.set(0);
 		}
 		if (isStop.get()) {
 			detector.quit();

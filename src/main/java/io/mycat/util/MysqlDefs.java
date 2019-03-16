@@ -342,6 +342,10 @@ public final class MysqlDefs {
 				return javaType;
 			}
 		}
+		case Types.BINARY:
+		case Types.VARBINARY: {  //Types.BINRARY makes the last mysql column type GEOMETRY, NOT BLOB or Binary
+			return Types.LONGVARBINARY;
+		}
 		default: {
 			return javaType;
 		}
@@ -589,6 +593,20 @@ public final class MysqlDefs {
 		default:
 			return " Unknown MySQL Type # " + mysqlType;
 		}
+	}
+
+	public static boolean isBianry(byte mysqlType) {
+		int type = mysqlType;
+		if(type < 0) {
+			type += 256;
+		}
+
+		if(type == MysqlDefs.FIELD_TYPE_BLOB || type == MysqlDefs.FIELD_TYPE_TINY_BLOB ||
+				type == MysqlDefs.FIELD_TYPE_MEDIUM_BLOB || type == MysqlDefs.FIELD_TYPE_LONG_BLOB) {
+			return true;
+		}
+
+		return false;
 	}
 
 	private static Map<String, Integer> mysqlToJdbcTypesMap = new HashMap<String, Integer>();

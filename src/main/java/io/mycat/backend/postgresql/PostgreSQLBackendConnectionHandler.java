@@ -1,47 +1,26 @@
 package io.mycat.backend.postgresql;
 
+import com.alibaba.fastjson.JSON;
 import io.mycat.MycatServer;
 import io.mycat.backend.mysql.nio.handler.ResponseHandler;
 import io.mycat.backend.postgresql.PostgreSQLBackendConnection.BackendConnectionState;
-import io.mycat.backend.postgresql.packet.AuthenticationPacket;
+import io.mycat.backend.postgresql.packet.*;
 import io.mycat.backend.postgresql.packet.AuthenticationPacket.AuthType;
-import io.mycat.backend.postgresql.packet.BackendKeyData;
-import io.mycat.backend.postgresql.packet.CommandComplete;
-import io.mycat.backend.postgresql.packet.CopyInResponse;
-import io.mycat.backend.postgresql.packet.CopyOutResponse;
-import io.mycat.backend.postgresql.packet.DataRow;
-import io.mycat.backend.postgresql.packet.EmptyQueryResponse;
-import io.mycat.backend.postgresql.packet.ErrorResponse;
-import io.mycat.backend.postgresql.packet.NoticeResponse;
-import io.mycat.backend.postgresql.packet.NotificationResponse;
-import io.mycat.backend.postgresql.packet.ParameterStatus;
-import io.mycat.backend.postgresql.packet.PasswordMessage;
-import io.mycat.backend.postgresql.packet.PostgreSQLPacket;
-import io.mycat.backend.postgresql.packet.ReadyForQuery;
 import io.mycat.backend.postgresql.packet.ReadyForQuery.TransactionState;
-import io.mycat.backend.postgresql.packet.RowDescription;
 import io.mycat.backend.postgresql.utils.PacketUtils;
 import io.mycat.backend.postgresql.utils.PgPacketApaterUtils;
 import io.mycat.buffer.BufferArray;
 import io.mycat.config.ErrorCode;
 import io.mycat.net.handler.BackendAsyncHandler;
-import io.mycat.net.mysql.EOFPacket;
-import io.mycat.net.mysql.ErrorPacket;
-import io.mycat.net.mysql.FieldPacket;
-import io.mycat.net.mysql.OkPacket;
-import io.mycat.net.mysql.ResultSetHeaderPacket;
-import io.mycat.net.mysql.RowDataPacket;
+import io.mycat.net.mysql.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.alibaba.fastjson.JSON;
 
 public class PostgreSQLBackendConnectionHandler extends BackendAsyncHandler {
 	static class SelectResponse {
@@ -81,6 +60,12 @@ public class PostgreSQLBackendConnectionHandler extends BackendAsyncHandler {
 	 * 每个后台响应有唯一的连接
 	 */
 	private final PostgreSQLBackendConnection source;
+	
+	/**
+	 * 响应数据
+	 */
+	private volatile SelectResponse response = null;
+	
 	/**
 	 * 响应状态
 	 */
@@ -114,8 +99,8 @@ public class PostgreSQLBackendConnectionHandler extends BackendAsyncHandler {
 						PasswordMessage pak = new PasswordMessage(
 								con.getUser(), con.getPassword(), aut,
 								((AuthenticationPacket) packet).getSalt());
-						ByteBuffer buffer = ByteBuffer
-								.allocate(pak.getLength() + 1);
+						
+						ByteBuffer buffer = con.allocate(); //allocate(pak.getLength() + 1);
 						pak.write(buffer);
 						
 						con.write(buffer);
@@ -138,7 +123,7 @@ public class PostgreSQLBackendConnectionHandler extends BackendAsyncHandler {
 			}
 
 		} catch (IOException e) {
-			e.printStackTrace();
+			LOGGER.error("error",e);
 		}
 	}
 
@@ -156,9 +141,10 @@ public class PostgreSQLBackendConnectionHandler extends BackendAsyncHandler {
 			List<PostgreSQLPacket> packets = PacketUtils.parsePacket(buf, 0,
 					readedLength);
 			if (packets == null || packets.isEmpty()) {
-				throw new RuntimeException("数据包解析出错");
+				return ;
+				//throw new RuntimeException("数据包解析出错");
 			}
-			SelectResponse response = null;
+			
 			for (PostgreSQLPacket packet : packets) {
 				if (packet instanceof ErrorResponse) {
 					doProcessErrorResponse(con, (ErrorResponse) packet);
@@ -285,11 +271,11 @@ public class PostgreSQLBackendConnectionHandler extends BackendAsyncHandler {
 			doProcessBusinessQuery(con, response, commandComplete);
 		} else {
 			OkPacket okPck = new OkPacket();
-			okPck.affectedRows = 0;
-			okPck.insertId = 0;
+			
+			okPck.affectedRows =commandComplete.getAffectedRows();
+			okPck.insertId =commandComplete.getInsertId();
 			okPck.packetId = ++packetId;
-			okPck.message = commandComplete.getCommandResponse().trim()
-					.getBytes();
+			okPck.message = commandComplete.getCommandResponse().getBytes();
 			con.getResponseHandler().okResponse(okPck.writeToBytes(), con);
 		}
 	}
@@ -375,15 +361,18 @@ public class PostgreSQLBackendConnectionHandler extends BackendAsyncHandler {
 	 */
 	@Override
 	protected void handleData(byte[] data) {
+		ByteBuffer theBuf = null;
 		try {
+			theBuf = source.allocate();
+			theBuf.put(data);
 			switch (source.getState()) {
 			case connecting: {
-				doConnecting(source, ByteBuffer.wrap(data), 0, data.length);
+				doConnecting(source, theBuf, 0, data.length);
 				return;
 			}
 			case connected: {
 				try {
-					doHandleBusinessMsg(source, ByteBuffer.wrap(data), 0,
+					doHandleBusinessMsg(source, theBuf , 0,
 							data.length);
 				} catch (Exception e) {
 					LOGGER.warn("caught err of con " + source, e);
@@ -399,6 +388,10 @@ public class PostgreSQLBackendConnectionHandler extends BackendAsyncHandler {
 			}
 		} catch (Exception e) {
 			LOGGER.error("读取数据包出错",e);
+		}finally{
+			if(theBuf!=null){
+				source.recycle(theBuf);
+			}
 		}
 	}
 

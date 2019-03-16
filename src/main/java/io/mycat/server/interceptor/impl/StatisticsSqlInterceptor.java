@@ -1,5 +1,13 @@
 package io.mycat.server.interceptor.impl;
 
+import io.mycat.MycatServer;
+import io.mycat.config.model.SystemConfig;
+import io.mycat.server.interceptor.SQLInterceptor;
+import io.mycat.server.parser.ServerParse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.DateFormat;
@@ -7,15 +15,6 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
-
-import org.slf4j.Logger; import org.slf4j.LoggerFactory;
-
-import io.mycat.MycatServer;
-import io.mycat.config.model.SystemConfig;
-import io.mycat.server.interceptor.SQLInterceptor;
-import io.mycat.server.parser.ServerParse;
-
-import java.io.File;
 
 public class StatisticsSqlInterceptor implements SQLInterceptor {
     
@@ -62,7 +61,7 @@ private final class StatisticsSqlRunner implements Runnable {
                 }
                 
             } catch (Exception e) {
-                LOGGER.error("interceptSQL error:" + e.getMessage());
+                LOGGER.error("interceptSQL error:" + e.getMessage(),e);
             }
         }
     }
@@ -89,7 +88,7 @@ private final class StatisticsSqlRunner implements Runnable {
         Calendar calendar = Calendar.getInstance();
         DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
         String dayFile = dateFormat.format(calendar.getTime());
-        
+        FileWriter writer = null;
         try {
             String newFileName = fileName;
             //打开一个写文件器，构造函数中的第二个参数true表示以追加形式写文件
@@ -101,14 +100,22 @@ private final class StatisticsSqlRunner implements Runnable {
             if (!file.exists()) {
                 file.createNewFile();
             }
-            FileWriter writer = new FileWriter(file, true);
+            writer = new FileWriter(file, true);
             String newContent = content.replaceAll("[\\t\\n\\r]", "")
                 + System.getProperty("line.separator");
             writer.write(newContent);
             
-            writer.close();
+            writer.flush();
         } catch (IOException e) {
-            LOGGER.error("appendFile error:" + e);
+            LOGGER.error("appendFile error:" + e.getMessage(),e);
+        } finally {
+            if(writer != null ){
+                try {
+                    writer.close();
+                } catch (IOException e) {
+                    LOGGER.error("close file error:" + e.getMessage(),e);
+                }
+            }
         }
     }
     
